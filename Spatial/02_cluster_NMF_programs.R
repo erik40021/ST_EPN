@@ -23,7 +23,8 @@ sample_ids = list.files(input_dir); sample_ids = sample_ids[sample_ids %in% meta
 sample_colors = as.character(createPalette(N = length(sample_ids), seedcolors = alphabet.colors(26)))
 cluster_colors = my_cols
 
-# adapted from Gavish et al. 2023 and Muenter et al. 2025
+# primary clustering of programs was adapted from Gavish et al. 2023 and Muenter et al. 2025
+# same as for single-nucleus analysis, but with adapted clustering parameters, reordering and annotations
 
 ### ------------------ part 1: Aggregate W matrices (genes x modules) of all samples and all its ranks --------------------------
 max_rank = 20 # limit highest rank considered to not inflate number of programs
@@ -65,9 +66,11 @@ saveRDS(aggregated_w_matrices, file = file.path(base_out_dir, "aggregated_w_matr
 intra_min_parameter = 25 # minimal gene overlap between programs of the same sample needed to call them 'robust programs'
 intra_max_parameter = 10 # programs of the same sample with HIGHER gene overlap are considered redundant (and therefore removed)
 inter_min_parameter = 8 # minimal gene overlap between programs of two different samples, only used if inter_filter = TRUE
+
 # >>>>>>> b) key METAPROGRAM parameters <<<<<<<
 min_intersect = 10 # minimal number of genes intersecting between robust programs to be aggregated to metaprogram
 min_group = 2 # minimal number of (significant) intersections a robust program must have to qualify for metaprogram initiation
+
 # >>>>>>> c) metaprogram evaluation and re-assignment parameters (optional) <<<<<<<
 min_intersect_final = 8 # minimal mean intersecting genes between a robust program and all genes of the initial metaprogram programs to be finally assigned to it
 min_mp_size_final = 5 # minimal number of robust programs a final metaprogram must contain
@@ -158,7 +161,7 @@ while (Sorted_intersection[1] >= Min_group_size) {
   # print(paste0("sorted intersection[1] now: ", Sorted_intersection[1]))
 }
 
-# 2.3 --- Re-sort robust programs to metaprograms (OPTIONAL) ---
+# 2.3 --- Re-sort robust programs to metaprograms ---
 # a) re-assign all robust programs to the best matching MP (if different to initial assignment), then re-calculate genes
 final_MP_programs = replicate(length(MP_programs), vector(), simplify = FALSE); names(final_MP_programs) = names(MP_programs)
 for (prog in colnames(robust_programs_original)) {
