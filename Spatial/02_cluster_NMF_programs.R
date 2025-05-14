@@ -12,9 +12,8 @@ library(patchwork)
 library(dplyr)
 library(Polychrome)
 
-utils_dir = "utils"
-source(file.path(utils_dir, "r_utils.R"))
-source(file.path(utils_dir, "NMF_utils.R"))
+source("utils/r_utils.R")
+source("utils/NMF_utils.R")
 
 base_out_dir = "NMF"; if(!dir.exists(base_out_dir)) dir.create(base_out_dir, r=T)
 input_dir = "NMF/programs by sample"
@@ -201,7 +200,7 @@ for (i in 1:length(MP_programs_temp)){
 remaining_NMF_excel = data.frame(robust_programs[, !colnames(robust_programs) %in% unlist(MP_programs)])
 write_xlsx(list("MP genes" = MP_excel, "All robust NMF Programs" = as.data.frame(robust_programs_original), "Robust programs intersects" = robust_program_intersects_excel, 
                 "MP programs" = as.data.frame(MP_programs_temp), "Robust programs not in MPs" = remaining_NMF_excel), 
-           path = file.path(out_dir, "NMF_metaprograms_main.xlsx"))
+           path = file.path(out_dir, "spatial_NMF_metaprograms_main.xlsx"))
 
 
 ### ------------------- part 3: Plot heatmaps of metaprograms ----------------------------
@@ -331,7 +330,7 @@ ggsave(p1, filename = "04e_barplot_MPs_by-sex-and-age.png", width = 6, height = 
 
                                
 # ------------------------ part 5: Annotate MPs ----------------------------
-metaprograms = read_excel(file.path(out_dir, "NMF_metaprograms_main.xlsx"), sheet = "MP genes")
+metaprograms = read_excel(file.path(out_dir, "spatial_NMF_metaprograms_main.xlsx"), sheet = "MP genes")
 
 # a) annotate with EPN-ST signatures
 # heatmap_col1 = colorRampPalette(rev(brewer.pal(n = 11, name = "RdBu")))(100)
@@ -364,11 +363,6 @@ for (i in 1:length(ref_all_tirosh)) {
 
 
 
-
-
-
-
-
 # ------------------------ part 6: Plot customly ordered final heatmap ----------------------------
 
 new_order = c(1,13,4,11, 8,5,3,6,7,9,10,12, 2) # define custom order of MPs here, based on biological similarity and to give better overview
@@ -390,10 +384,10 @@ ggsave(g, filename = "heatmap_MPs_custom_order.png", width = 10.5, height = 8, p
 
 # --- if certain to use the new order, replot all previous plots and update order of MPs in excel ---
 # 1. change order in labeled excel table
-reorder_excel_sheet_columns(file.path(out_dir, "NMF_metaprograms_main.xlsx"), sheets = c("MP genes", "MP programs"), new_order)
+reorder_excel_sheet_columns(file.path(out_dir, "spatial_NMF_metaprograms_main.xlsx"), sheets = c("MP genes", "MP programs"), new_order)
 
 # 2. apply labels in new order from excel to MP_genes and MP_programs
-metaprograms = read_excel(file.path(out_dir, "NMF_metaprograms_main.xlsx"), sheet = "MP genes")
+metaprograms = read_excel(file.path(out_dir, "spatial_NMF_metaprograms_main.xlsx"), sheet = "MP genes")
 MP_programs = MP_programs_reordered; names(MP_programs) = colnames(metaprograms)
 MP_genes = MP_genes_reordered; names(MP_genes) = colnames(metaprograms)
 saveRDS(MP_genes, file.path(mp_gen_dir, "metaprogram_genes.RDS"))
@@ -403,4 +397,43 @@ saveRDS(MP_programs, file.path(mp_gen_dir, "metaprogram_programs.RDS"))
 mp_gen_dir = file.path(out_dir, "Custom order/MP generation"); if (!dir.exists(mp_gen_dir)) dir.create(mp_gen_dir, r = T)
 anno_out_dir = file.path(out_dir, "Custom order/Annotation"); if (!dir.exists(anno_out_dir)) dir.create(anno_out_dir)
 # ------
+
+                                                                                                                                                                                                                       
+                                                                                                                                                                                                                       
+# ------------------------ part 7: transfer MPs to spatial objects ----------------------------
+source("utils/seurat_utils.R")
+source("utils/spatial_utils.R")
+mp_list = lapply(metaprograms, function(col) col)
+names(my_cols) = names(mp_list); overview_subtitles = c(colnames(metaprograms), "[Counts]", "[Features]", "[H&E]")
+out_dir = paste0("Plots/Metaprograms"); if(!dir.exists(out_dir)) dir.create(out_dir, r = T)
+
+for (s in sample_ids) {
+  message(">>> [PART 3] transferring MPs to '", s, "' [", format(Sys.time(), "%d.%m. %X"), "] <<<")
+  sstobj = readRDS(file = paste0("Objects/sstobj_", s, ".rds"))
+  sstobj = try_add_module_score(sstobj, features = mp_list, name = "MP", ctrl = 100, min_ctrl = 50, nbin = 24, min_bin = 18, verbose = T)
+  sstobj = assign_cells_by_max_score(sstobj, score_names = paste0("MP", 1:length(mp_list)), meta_data_entry_name = "metaprogram")
+  levels(sstobj$metaprogram) = names(mp_list) # (optional) name MPs according to (ordered) annotated names
+  sstobj = transform_modscores_by_program(sstobj, score_names = paste0("MP", 1:length(mp_list)), transformation = "min_max",
+                                          transformed_score_names = paste0("MP", 1:length(mp_list), "_mp-norm")) # transform module scores across programs
+  sstobj = transform_modscores_by_cell(sstobj, score_names = paste0("MP", 1:length(mp_list)), transformation = "normalisation", # transform module scores across spots
+                                       min_score_threshold = 0, transformed_score_names = paste0("MP", 1:length(mp_list), "_spot-norm"))
+  ratio = get_spatial_aspect_ratio(sstobj); pt_size = get_spatial_point_size(sstobj, scale_factor = 3.5) # spatial plot params
+  p = SpatialDimPlot(sstobj, pt.size.factor = pt_size, group.by = "metaprogram", cols = st_mp_cols, image.alpha = 0) + theme(aspect.ratio = ratio)
+  ggsave(filename = paste0(s, "_metaprograms_in_tissue.png"), plot = p, width = 5, height = 4, path = out_dir)
+  
+  p = c(as.list(SpatialPlot(sstobj, pt.size.factor = pt_size, features = paste0("MP", 1:length(mp_list)), image.alpha = 0)), 
+        list(SpatialFeaturePlot(sstobj, features = "nCount_Spatial", pt.size.factor = pt_size, image.alpha = 0) + theme(aspect.ratio = ratio), 
+             SpatialFeaturePlot(sstobj, features = "nFeature_Spatial", pt.size.factor = pt_size, image.alpha = 0) + theme(aspect.ratio = ratio), 
+             SpatialFeaturePlot(sstobj, features = NULL, alpha = 0) + NoLegend()))
+  p = lapply(1:length(p), function(i) p[[i]] + ggtitle(overview_subtitles[i]) + labs(fill = NULL) + 
+               theme(aspect.ratio = ratio, plot.margin = unit(c(0,0,0,0), "mm"), plot.title = element_text(hjust = 0.5)))
+  p1 = (wrap_plots(p[1:12], ncol = 6) | wrap_plots(p[13:15], ncol = 1)) + plot_layout(widths = c(12,1))
+  ggsave(filename = paste0(s, "_overview_MP_module_scores_counts_features_H&E.png"), plot = p1, width = 20, height = 10, path = out_dir)
+  # plot mp module scores also with legend scales aligned
+  global_max <- max(sapply(p[1:length(mp_list)], function(pi) max(pi$data[, 4], na.rm = TRUE))); global_min <- min(sapply(p[1:length(mp_list)], function(pi) min(pi$data[, 4], na.rm = TRUE)))
+  p2 = lapply(p[1:length(mp_list)], function(pi) pi + scale_fill_gradientn(colors = Seurat:::SpatialColors(n = 100), limits = c(global_min, global_max)))
+  ggsave(filename = paste0(s, "_MP_module_scores_same-scale.png"), plot = wrap_plots(p2, ncol = 6), width = 20, height = 10, path = out_dir)
+  saveRDS(sstobj, paste0("Objects/sstobj_", s, ".rds"))
+}
+
 
