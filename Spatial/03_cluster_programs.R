@@ -13,11 +13,9 @@ library(patchwork)
 library(dplyr)
 library(Polychrome)
 
-utils_dir = ""
+utils_dir = "utils"
 source(file.path(utils_dir, "r_utils.R"))
 source(file.path(utils_dir, "NMF_utils.R"))
-source(file.path(utils_dir, "Single cell/seurat_utils.R"))
-source(file.path(utils_dir, "Spatial/spatial_utils.R"))
 
 base_out_dir = "NMF"; if(!dir.exists(base_out_dir)) dir.create(base_out_dir, r=T)
 input_dir = "NMF/programs by sample"
@@ -25,6 +23,8 @@ metadata = read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[g
 sample_ids = list.files(input_dir); sample_ids = sample_ids[sample_ids %in% metadata$`Study ID`]
 sample_colors = as.character(createPalette(N = length(sample_ids), seedcolors = alphabet.colors(26)))
 cluster_colors = my_cols
+
+# adapted from Gavish et al. 2023 and Muenter et al. 2025
 
 ### ------------------ part 1: Aggregate W matrices (genes x modules) of all samples and all its ranks --------------------------
 max_rank = 20 # limit highest rank considered to not inflate number of programs
@@ -88,7 +88,6 @@ message("Loaded ", sum(unlist(lapply(aggregated_w_matrices, length))), " program
 # - nmf_modules = a list; each element is a matrix of all modules of a sample and their top 50 genes 
 # - inter_filter = logical; indicates whether programs should be filtered based on their similarity to programs of other samples
 nmf_modules = lapply(aggregated_w_matrices, function(x) apply(x, 2, function(y) names(sort(y, decreasing = T))[1:50])) # get top 50 genes for each NMF program 
-# robust_programs = lapply(robust_programs,toupper) ## convert all genes to uppercase (should be the case already... try without next time as it makes ORFs to upper case too which needs to be changed later then)
 
 # for each sample, select robust NMF programs (i.e. observed using different ranks in the same sample), remove redundancy due to multiple ranks, and apply a filter based on the similarity to programs from other samples. 
 robust_program_names = robust_nmf_programs(nmf_modules, intra_min = intra_min_parameter, intra_max = intra_max_parameter, inter_filter = T, inter_min = inter_min_parameter)  
@@ -248,15 +247,9 @@ anno = ggplot(data = color_data, aes(x = 0, y = y)) + geom_tile(aes(fill = Color
   theme(axis.title = element_blank(), axis.text.y = element_text(), axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.margin = unit(c(1,0,1,1), "cm")) + labs(x = NULL, y = NULL) + scale_y_discrete(breaks = color_data$y, labels = color_data$name)
 ggsave(anno + g2 + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main.png", width = 10, height = 8, path = mp_gen_dir)
 
-cols = c(colorRampPalette(c("white", rev(viridis::rocket(323, begin = 0.13))[1]))(20), rev(viridis::rocket(323, begin = 0.1)))
 cols = c(colorRampPalette(c("white", rev(viridis::mako(323, begin = 0.13))[1]))(20), rev(viridis::mako(323, begin = 0.1)))
-cols = c(colorRampPalette(c("white", rev(dichromat(viridis::magma(323, begin = 0.13)))[1]))(20), rev(dichromat(viridis::magma(323, begin = 0.1))))
-cols = c(colorRampPalette(c("white", brewer.pal(n = 9, name = "YlGnBu")[1]))(20), colorRampPalette(brewer.pal(n = 9, name = "YlGnBu"))(323))
-cols = c(colorRampPalette(c("white", brewer.pal(n = 9, name = "Blues")[1]))(20), colorRampPalette(brewer.pal(n = 9, name = "Blues"))(323))
-
-plot_NMF_heatmap(robust_program_intersects_meltI, xlab = paste0("robust NMF program (n = ",length(inds_sorted), ")"), ylab = "robust NMF program", limits = c(5,25),
-                      cols = cols)
-ggsave(anno + g2 + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main_alternative-color3.png", width = 10, height = 8, path = mp_gen_dir)
+plot_NMF_heatmap(robust_program_intersects_meltI, xlab = paste0("robust NMF program (n = ",length(inds_sorted), ")"), ylab = "robust NMF program", limits = c(5,25), cols = cols)
+ggsave(anno + g2 + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main_alternative-color.png", width = 10, height = 8, path = mp_gen_dir)
 
 
 # c) labeled main heatmaps
@@ -334,9 +327,7 @@ p2 = ggplot(data, aes(x=metaprograms, y=n_percent, fill = age)) + geom_bar(stat=
   scale_fill_manual(values = cluster_colors) + geom_col() + scale_y_continuous(breaks = c(0, 0.5, 1)) + coord_cartesian(ylim = c(0, 1))
 ggsave(p1, filename = "04e_barplot_MPs_by-sex-and-age.png", width = 6, height = 2.5, path = mp_gen_dir)
 
-# vi. composition of MPs regarding batches (technical variable)  <- makes no sense in spatial
-
-
+                               
 # ------------------------ part 5: Annotate MPs ----------------------------
 metaprograms = read_excel(file.path(out_dir, "NMF_metaprograms_main.xlsx"), sheet = "MP genes")
 
