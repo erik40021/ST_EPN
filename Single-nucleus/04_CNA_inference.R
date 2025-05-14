@@ -63,7 +63,7 @@ run_infercnv_sc = function(s, subset_sobj, out_dir, ref_clusters, inner_cores, g
                               num_threads = inner_cores, output_format = "png", window_length = 101, cluster_by_groups=F)
 
   message('finished infercnv run')
-  if (prepare_plot_data & !file.exists(paste0(out_dir, "/ordered_cna_louvain-res", louvain_res, "_clusters.rds"))) {
+  if (prepare_plot_data) {
     cna_mtx = infercnv_obj@expr.data # cna prediction matrix
     cna_mtx = cna_mtx[, -unlist(infercnv_obj@reference_grouped_cell_indices)] # remove all reference cells
 
