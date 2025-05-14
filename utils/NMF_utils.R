@@ -31,3 +31,81 @@ calculate_dominant_genes = function(programs) {
   if (length(final_genes[is.na(final_genes)]) > 0) stop("NA included in genes of MP")
   return(final_genes)
 }
+
+# original from Gavish et al. 2023
+NMFToModules = function(res, gmin = 5){
+  scores = basis(res)
+  coefs = coefficients(res)
+  # Remove if fewer than gmin genes
+  ranks_x = t(apply(-t(t(scores) / apply(scores, 2, mean)), 1, rank))
+  ranks_y = apply(-t(t(scores) / apply(scores, 2, mean)), 2, rank)
+  for (i in 1:ncol(scores)) ranks_y[ranks_x[,i] > 1,i] = Inf
+  modules = apply(ranks_y, 2, function(m){
+    a = sort(m[is.finite(m)])
+    a = a[a == 1:length(a)]
+    names(a)
+  })
+  l = sapply(modules, length)
+  keep = (l >= gmin)
+  if (sum(keep) < 2) { message("Less than 2 modules found in NMF res of rank ", dim(res)[3], " with sufficient number of genes (> ", gmin, ")"); return(NULL)}
+  scores = scores[, keep]
+  coefs = coefs[keep, ]
+  
+  # Find modules
+  ranks_x = t(apply(-t(t(scores) / apply(scores, 2, mean)), 1, rank))
+  ranks_y = apply(-t(t(scores) / apply(scores, 2, mean)), 2, rank)
+  for (i in 1:ncol(scores)){
+    ranks_y[ranks_x[,i] > 1,i] = Inf
+  }
+  modules = apply(ranks_y, 2, function(m){
+    a = sort(m[is.finite(m)])
+    a = a[a == 1:length(a)]
+    names(a)
+  })
+  names(modules) = sapply(modules, '[', 1)
+  names(modules) = paste('m', names(modules), sep = '_')
+  names(modules) = gsub('-','_',names(modules))
+  return(modules)
+}
+
+# original from Gavish et al. 2023
+# Function for selecting robust non-negative matrix factorization (NMF) programs
+# - nmf_programs = a list; each element contains a matrix with NMF programs (top 50 genes) generated for a specific sample using different NMF factorization ranks. 
+# - intra_min = minimum overlap with a program from the same sample (for selecting robust programs)
+# - intra_max = maximum overlap with a program from the same sample (for removing redundant programs)
+# - inter_filter = logical; indicates whether programs should be filtered based on their similarity to programs of other cell lines
+# - inter_min = minimum overlap with a program from another sample 
+# -> returns a character vector with the NMF programs selected
+robust_nmf_programs <- function(nmf_programs, intra_min = 35, intra_max = 10, inter_filter=T, inter_min = 10) {
+  message("started filtering of robust programs with initially ", sum(sapply(nmf_programs, ncol)), " programs")
+  # Select NMF programs based on the minimum overlap with other NMF programs from the same sample
+  intra_intersect <- lapply(nmf_programs, function(z) apply(z, 2, function(x) apply(z, 2, function(y) length(intersect(x,y))))) 
+  intra_intersect_max <- lapply(intra_intersect, function(x) apply(x, 2, function(y) sort(y, decreasing = T)[2]))             
+  nmf_sel <- lapply(names(nmf_programs), function(x) nmf_programs[[x]][,intra_intersect_max[[x]]>=intra_min]) 
+  names(nmf_sel) <- names(nmf_programs)
+  message("programs remaining after filtering for intra_min >= ", intra_min, ": ", sum(sapply(nmf_sel, ncol)))
+  
+  # Select NMF programs based on i) the maximum overlap with other NMF programs from the same sample and
+  # ii) the minimum overlap with programs from another sample
+  nmf_sel_unlist <- do.call(cbind, nmf_sel)
+  inter_intersect <- apply(nmf_sel_unlist , 2, function(x) apply(nmf_sel_unlist , 2, function(y) length(intersect(x,y)))) ## calculating intersection between all programs
+  
+  final_filter <- NULL
+  for(i in names(nmf_sel)) {
+    sample_id = sub("_rank.*", "", i)
+    a <- inter_intersect[grep(sample_id, colnames(inter_intersect), invert = T), grep(sample_id, colnames(inter_intersect))]
+    b <- sort(apply(a, 2, max), decreasing = T) # for each sample, ranks programs based on their maximum overlap with programs of other samples
+    if(inter_filter==T) b <- b[b>=inter_min] # selects programs with an intersection of at least inter_min (e.g. 10) to other samples' programs, all others are thrown out
+    if(length(b) > 1) {
+      c <- names(b[1]) 
+      for(y in 2:length(b)) {
+        if(max(inter_intersect[c,names(b[y])]) <= intra_max) c <- c(c,names(b[y])) # selects programs iteratively from top-down. Only selects programs that have an intersection smaller than or equal to intra_max (e.g. 10) with a previously selected program of the same sample
+      }
+      final_filter <- c(final_filter, c)
+    } else {
+      final_filter <- c(final_filter, names(b))
+    }
+  }
+  message("programs remaining after filtering for intra_max <= ", intra_max, " and inter_min >= ", inter_min ,": ", length(unique(final_filter)))
+  return(unique(final_filter))                                                      
+}
