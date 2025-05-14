@@ -1,5 +1,4 @@
 library(reshape2)
-library(NMF)
 library(ggplot2)
 library(scales)
 library(writexl)
@@ -19,7 +18,7 @@ source(file.path(utils_dir, "NMF_utils.R"))
 
 base_out_dir = "NMF"; if(!dir.exists(base_out_dir)) dir.create(base_out_dir, r=T)
 input_dir = "NMF/programs by sample"
-metadata = read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("2", metadata$`Analyses*`), ]
+metadata = read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("2", metadata$`Analyses*`), ] # subset to only spatial samples
 sample_ids = list.files(input_dir); sample_ids = sample_ids[sample_ids %in% metadata$`Study ID`]
 sample_colors = as.character(createPalette(N = length(sample_ids), seedcolors = alphabet.colors(26)))
 cluster_colors = my_cols
