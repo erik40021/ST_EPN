@@ -177,16 +177,6 @@ add_annotation_from_excelsheet = function(sobj, metadata, col_name, annotation_i
   return(sobj)
 }
 
-# EXAMPLE use:   sobj = store_cluster_labels(sobj, c("label1", "label2", ...), "rpca_labels", "rpca_clusters")
-store_cluster_labels = function(sobj, labels, label_name, clusters_to_annotate = "rpca_clusters") {
-  # cluster_ids = unique(sobj@meta.data[[clusters_to_annotate]]) # 1. copy meta.data slot of clusters to be annotated
-  # if (length(labels) != length(levels(cluster_ids))) stop("Error: Number of given labels (n=", length(labels), ") does not match number of clusters to be annotated (n=", length(levels(cluster_ids)), ")!")
-  # levels(cluster_ids) = labels # 2. rename levels of this factor type
-  # sobj@meta.data[[label_name]] = cluster_ids # 3. store in newly create meta.data slot
-  # return(sobj)
-  message("use: 'sobj$rpca_labels = factor(sobj$rpca_clusters, labels = cluster_labels)' instead")
-}
-
 add_absolute_feature_expression = function (object, pattern = NULL, features = NULL, col.name = NULL, assay = NULL) {
   assay <- assay %||% DefaultAssay(object = object)
   if (!is.null(x = features) && !is.null(x = pattern)) {
