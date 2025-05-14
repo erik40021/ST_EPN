@@ -25,3 +25,10 @@ try_add_module_score <- function(sobj, features, name, ctrl = 100, ctrl_decremen
     return(sobj)
   }
 }
+
+add_annotation_from_excelsheet = function(sobj, metadata, col_name, annotation_id, sample_id_col_name = "Study ID") {
+  subtype_annotation = data.frame(metadata[[col_name]], "s_ids" = metadata[[sample_id_col_name]])
+  ljoined_anno = merge(subtype_annotation, data.frame("s_ids" = sobj@meta.data$orig.ident), by = "s_ids", all.x = T, sort = F)
+  sobj@meta.data[[annotation_id]] = ljoined_anno[[2]]
+  return(sobj)
+}
