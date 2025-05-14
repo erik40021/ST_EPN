@@ -4,7 +4,7 @@ library(NMF)
 library(patchwork)
 
 source("utils/nmf_additional_functions.R")
-source("utils/spatial_utils.R")
+# source("utils/spatial_utils.R")
 
 s = commandArgs(trailingOnly = TRUE)[1] # ID of sample to run NMF for (first command line argument)
 
