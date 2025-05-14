@@ -22,10 +22,18 @@ sample_ids = list.files(input_dir); sample_ids = sample_ids[sample_ids %in% meta
 sample_colors = as.character(createPalette(N = length(sample_ids), seedcolors = alphabet.colors(26)))
 cluster_colors = my_cols
 
-# primary clustering of programs was adapted from Gavish et al. 2023 and Muenter et al. 2025
-# same as for single-nucleus analysis, but with adapted clustering parameters, reordering and annotations
+# same as in single-nucleus analysis, but with adapted clustering parameters, reordering, annotation, and transfer
 
-### ------------------ part 1: Aggregate W matrices (genes x modules) of all samples and all its ranks --------------------------
+
+# ------------------ part 0: Run NMF for every sample --------------------------
+# recommended to be run on server and in parallel
+obj_paths = paste0("Objects/sstobj_", sample_ids, ".rds")
+# to run locally: res = lapply(obj_paths, run_NMF(sobj_path, out_path, range = 2:20, n_features = 5000))
+
+
+
+# -> primary clustering of programs (parts 1 and 2) was adapted from Gavish et al. 2023 and Muenter et al. 2025 <-
+# ------------------ part 1: Aggregate W matrices (genes x modules) of all samples and all its ranks --------------------------
 max_rank = 20 # limit highest rank considered to not inflate number of programs
 aggregated_w_matrices = list()
 for (s in sample_ids) {
@@ -58,7 +66,7 @@ saveRDS(aggregated_w_matrices, file = file.path(base_out_dir, "aggregated_w_matr
 
 
 
-### ------------------- part 2: Generate robust programs and metaprograms ----------------------------
+# ------------------- part 2: Generate robust programs and metaprograms ----------------------------
 
 # ----------------------------------
 # >>>>>>> a) key ROBUST PROGRAM parameters <<<<<<<
@@ -202,8 +210,8 @@ write_xlsx(list("MP genes" = MP_excel, "All robust NMF Programs" = as.data.frame
                 "MP programs" = as.data.frame(MP_programs_temp), "Robust programs not in MPs" = remaining_NMF_excel), 
            path = file.path(out_dir, "spatial_NMF_metaprograms_main.xlsx"))
 
-
-### ------------------- part 3: Plot heatmaps of metaprograms ----------------------------
+                           
+# ------------------- part 3: Plot heatmaps of metaprograms ----------------------------
 # a) main MP heatmap but with reordered metaprograms (optional)
 mps_reordered = MP_programs[order(sapply(MP_programs, length), decreasing = T)]
 reorder = 1:length(mps_reordered)
@@ -283,7 +291,7 @@ ggsave(g, filename = "03c_heatmap_MPs_labeled-by-patient.png", width = 14.6, hei
 
 
 
-### ------------------- part 4: Plot composition of metaprograms ----------------------------
+# ------------------- part 4: Plot composition of metaprograms ----------------------------
 # i. composition of MPs regarding samples
 samples_per_metaprogram = lapply(MP_programs, function(x){sub("_rank.*$", "",x)})
 data = data.frame(samples = rep(unique(sample_ids), length(samples_per_metaprogram)))
