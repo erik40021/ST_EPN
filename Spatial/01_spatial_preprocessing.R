@@ -7,7 +7,6 @@ library(readxl)
 
 utils_dir = ""
 cloud_path = ""
-source(file.path(utils_dir, "r_utils.R"))
 source(file.path(utils_dir, "Single cell/seurat_utils.R"))
 source(file.path(utils_dir, "Spatial/spatial_utils.R"))
 
