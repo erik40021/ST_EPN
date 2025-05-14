@@ -5,10 +5,9 @@ library(pals)
 library(RColorBrewer)
 library(readxl)
 
-utils_dir = ""
 cloud_path = ""
-source(file.path(utils_dir, "Single cell/seurat_utils.R"))
-source(file.path(utils_dir, "Spatial/spatial_utils.R"))
+source("utils/seurat_utils.R")
+source("utils/spatial_utils.R")
 
 
 metadata = readxl::read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("2", metadata$`Analyses*`), ]
