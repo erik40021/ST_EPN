@@ -4,37 +4,162 @@ library(ggpubr)
 library(pheatmap)
 library(RColorBrewer)
 library(ggplot2)
+library(Seurat)
+library(patchwork)
+library(ggpubr)
 
+cloud_path = ""
 source("utils/seurat_utils.R")
+
+preprocessing_dir = "Preprocessing/"; if(!dir.exists(preprocessing_dir)) dir.create(preprocessing_dir)
+plot_dir = paste0(preprocessing_dir, "QC/01 Before merging/"); if(!dir.exists(plot_dir)) dir.create(plot_dir, r=T)
+raw_obj_dir = "Objects/Raw objects by sample/"; if(!dir.exists(raw_obj_dir)) dir.create(raw_obj_dir, r=T)
 
 metadata = readxl::read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("1", metadata$`Analyses*`), ]
 sample_ids = metadata$`Study ID`
+sample_kks = metadata$`KK code` # internal ID
 
-preprocessing_dir = "Preprocessing/"
+
+# ---------------------- PART 0: OBJECT CREATION ---------------------
+# 1. collect all raw .h5 files to prepare for input for CellBender:
+for (i in 1:length(sample_ids)) {
+  message("collecting raw .h5 file for sample '", sample_ids[i], "' [", format(Sys.time(), "%d.%m. %X"), "]")
+  h5_file = paste0(cloud_path, metadata[metadata$`KK code` == sample_kks[i], ]$`SC data path`, sample_kks[i], "/count/sample_raw_feature_bc_matrix.h5")
+  target_path = paste0(preprocessing_dir, "Raw h5 files/", sample_kks[i], "_sample_raw_feature_bc_matrix.h5")
+  file.copy(h5_file, target_path)
+}
+
+# 2. >>> run CellBender with default parameters in Python on CUDA-compatible GPU linux server <<<
+
+# 3. create objects based on consensus CellBender and CellRanger-filtered .h5 count matrices
+objects = lapply(1:length(sample_ids), function(i) {
+  message("creating seurat object for sample '", sample_ids[i], "' [", format(Sys.time(), "%d.%m. %X"), "]")
+  filtered_h5_file = paste0(cloud_path, "CB_filtered_h5/", sample_kks[i], "/processed_filtered.h5")
+  mtx = Read_CellBender_h5_Mat(filtered_h5_file) # default implementation (Read10X_h5) is bugged
+  obj_cb = CreateSeuratObject(counts = mtx, min.cells = 3, min.features = 200, project = sample_ids[i])
+  mtx = Read10X_h5(paste0(cloud_path, metadata[metadata$`KK code` == sample_kks[i], ]$`SC data path`, sample_kks[i], "/count/sample_filtered_feature_bc_matrix.h5"))
+  obj_cr = CreateSeuratObject(counts = mtx, min.cells = 3, min.features = 200, project = sample_ids[i])
+  obj = obj_cb[rownames(obj_cr), colnames(obj_cr)] # constructs the consensus (intersection) matrix of CellBender and CellRanger. Combines the CB-fitered matrix with CR-filtered cells and features
+  return(obj)
+})
+
+
+# ---------------------- PART 1: PLOT QCs PRE-FILTERING -------------------- 
+
+# 1. check standard QC metrics: features, counts, mt.pct
+for (feature in c("nFeature_RNA", "nCount_RNA", "percent.mt")) {
+  plots = lapply(1:length(sample_ids), function(i) {
+    if (feature == "percent.mt") objects[[i]][["percent.mt"]] <<- PercentageFeatureSet(objects[[i]], pattern = "^MT-")
+    return(VlnPlot(objects[[i]], features = feature) + NoLegend() + ggtitle(""))
+  })
+  ggsave(filename = paste0("01_unfiltered_qc_", feature, ".png"), plot = wrap_plots(plots, ncol = 20), width = 40, height = 20, path = plot_dir)
+}
+plots = lapply(1:length(sample_ids), function(i) VlnPlot(objects[[i]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
+ggsave(filename = paste0("01_unfiltered_qc_combined.png"), plot = wrap_plots(plots), width = 40, height = 20, path = plot_dir)
+
+# 2. check correlation of counts vs. mt.pct and counts vs. features
+plots = lapply(1:length(sample_ids), function(i){ FeatureScatter(objects[[i]], feature1 = "nCount_RNA", feature2 = "percent.mt") + NoLegend() + 
+    FeatureScatter(objects[[i]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA") })
+ggsave(filename = paste0("01_unfiltered_qc_correlations_combined.png"), plot = wrap_plots(plots), width = 40, height = 18, path = plot_dir)
+
+
+# ---------------------- PART 2: FILTERING -------------------- 
+
+# based on manual inspection of all relevant quality metrics, filter out low quality cells (doublets, empty droplets, ...)
+# --------------
+min_features = 200
+max_features = 8000
+max_mt_percentage = 15
+# --------------
+objects = lapply(objects, subset, subset = nFeature_RNA >= min_features & nFeature_RNA <= max_features & percent.mt <= max_mt_percentage)
+
+
+# ---------------------- PART 3: PLOT QCs POST-FILTERING -------------------- 
+write.table(data.frame(min_features, max_features, max_mt_percentage), file = paste0(plot_dir, "filters_used.txt"), sep = "\t", row.names = FALSE)
+
+# 1. check standard QC metrics: features, counts, mt.pct
+for (feature in c("nFeature_RNA", "nCount_RNA", "percent.mt")) {
+  plots = lapply(1:length(sample_ids), function(i) VlnPlot(objects[[i]], features = feature) + NoLegend() + ggtitle(""))
+  ggsave(filename = paste0("02_filtered_qc_", feature, ".png"), plot = wrap_plots(plots, ncol = 20), width = 40, height = 20, path = plot_dir)
+}
+plots = lapply(1:length(sample_ids), function(i) VlnPlot(objects[[i]], features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
+ggsave(filename = paste0("02_filtered_qc_combined.png"), plot = wrap_plots(plots), width = 40, height = 20, path = plot_dir)
+
+# 2. check correlation of counts vs. mt.pct and counts vs. features
+plots = lapply(1:length(sample_ids), function(i){ FeatureScatter(objects[[i]], feature1 = "nCount_RNA", feature2 = "percent.mt") + NoLegend() + 
+    FeatureScatter(objects[[i]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA") })
+ggsave(filename = paste0("02_filtered_qc_correlations_combined.png"), plot = wrap_plots(plots), width = 40, height = 18, path = plot_dir)
+
+
+# ---------------------- PART 4: AUTOMATED DOUBLET/MULTIPLET REMOVAL -------------------- 
+library(DoubletFinder)
+plot_dir = paste0(plot_dir, "Doublet removal/"); if (!dir.exists(plot_dir)) dir.create(plot_dir)
+# Set the estimated the number of doublets (e.g., 4% of cells)
+exp_doublet_pct = 0.04 # expected percentage of doublets
+objects_doub_filt = c()
+
+for (i in 1:length(sample_ids)) { # takes < 1 hour
+  message("removing doublets in sample '", sample_ids[i], "' [", format(Sys.time(), "%d.%m. %X"), "]")
+  obj = objects[[i]]
+  obj = obj %>% NormalizeData(verbose = F) %>% FindVariableFeatures(verbose = F) %>% ScaleData(verbose = F) %>% 
+    RunPCA(features = VariableFeatures(obj), verbose = F) %>% RunUMAP(dims = 1:10, verbose = F)
+  
+  # 1. run a parameter sweep to find the optimal pK value for DoubletFinder
+  {sink("null"); sweep_res <- paramSweep(obj, PCs = 1:10); sink();} # parameter sweep (sink just for message suppresion)
+  sweep_stats <- summarizeSweep(sweep_res, GT = FALSE)  # summarize results
+  pK <- find.pK(sweep_stats)  # find the optimal pK
+  optimal_pK <- as.character(pK$pK[which.max(pK$BCmetric)])  # select pK with highest BC metric
+  message("Optimal pK value found: ", optimal_pK)
+  
+  # 2. run DoubletFinder to classify doublets
+  n_doublets <- round(ncol(obj) * exp_doublet_pct)
+  message("Estimated number of doublets in sample: ", n_doublets)
+  obj <- doubletFinder(obj, PCs = 1:10, pN = 0.25, pK = as.numeric(optimal_pK), nExp = n_doublets, sct = F)
+  
+  # 3. visualize UMAP with doublet status
+  doublet_status <- obj@meta.data[[paste0("DF.classifications_0.25_", optimal_pK, "_", n_doublets)]]  # add doublet status
+  obj$doublet_status = doublet_status
+  p = DimPlot(obj, reduction = "umap", group.by = "doublet_status") + ggtitle("DoubletFinder Results")
+  ggsave(filename = paste0("umap_doublet_finder_result_", sample_ids[i], ".png"), plot = p, width = 8, height = 4, path = plot_dir)
+  
+  # 4. filter out doublets (in unprocessed initial object)
+  obj = objects[[i]]; obj$doublet_status = doublet_status
+  obj_filtered <- subset(obj, subset = doublet_status == "Singlet")  # keep only singlets
+  message("Removed ", ncol(obj) - ncol(obj_filtered), " cells (before: ", ncol(obj), ", after: ", ncol(obj_filtered), ")\n")
+  objects_doub_filt[[i]] = obj_filtered
+  gc()
+}
+objects = objects_doub_filt # overwrites previous objects
+
+# save filtered objects
+for (i in 1:length(sample_ids)) saveRDS(objects[[i]], file = paste0(raw_obj_dir, "filtered_", sample_ids[i], ".rds"))
+
+
+# ---------------------- PART 5: MERGE FILTERED OBJECTS --------------------            
 raw_obj_dir = "Objects/Raw objects by sample/"
 unintegrated_clust_dir = paste0(preprocessing_dir, "/Clustering/01 Before integration/"); if(!dir.exists(unintegrated_clust_dir)) dir.create(unintegrated_clust_dir, r=T)
 unintegrated_qc_dir = paste0(preprocessing_dir, "QC/02 Before integration/"); if(!dir.exists(unintegrated_qc_dir)) dir.create(unintegrated_qc_dir, r=T)
 
-### ----- check cohort quality (sequencing QC metrics) ----- ###
+# 1. check cohort quality (sequencing QC metrics)
 # plot number of cells specifically
 data = metadata; data$Samples = data$`Study ID`
 p = ggplot(data, aes(x=Samples, y=Cells)) + geom_bar(stat="identity") + theme_classic() + theme(axis.text=element_text(size=12), axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + ggtitle("Number of cells per sample")
 ggsave(filename = paste0("03_barplot_n-cells.png"), plot = p, width = 15, height = 5, path = "Preprocessing/QC/01 Before merging/")
 
-### ---------- exclusion & reduction of samples -------- ###
+# 2. exclusion & reduction of samples
 # -> decide on which samples to reduce if necessary <-
 sample_ids = metadata$`Study ID` # update to new/filtered sample_ids
 cell_limit = 6000 # limit will be applied to all samples
 
-### ------------------------- MERGING of raw objects --------------------------- ###
+# 3. merging
 sobjects = list()
 for (i in 1:length(sample_ids)) { # load raw, but pre-filtered objects
   sobjects[[sample_ids[i]]] = readRDS(file = paste0(raw_obj_dir, "filtered_", sample_ids[i], ".rds")) 
 }
 sobjects = reduce_cell_numbers(sobjects, cell_limit)
 sobj <- merge(x = sobjects[[1]], y = sobjects[2:length(sample_ids)], project = "ST-EPN_merged") # merge sample objects into a single Seurat object containing individual layers for each sample
-### ---------------------------------------------------------------------------- ###
 
+# 4. processing
 # run streamline processing functions (Normalization, FindVariableFeatures, ScaleData and RunPCA) for each layer individually (layers are not yet integrated)
 sobj <- NormalizeData(sobj)
 sobj <- FindVariableFeatures(sobj)
@@ -48,48 +173,41 @@ sobj <- FindNeighbors(sobj, dims = 1:pcs_chosen, reduction = "pca")
 sobj <- FindClusters(sobj, resolution = cluster_resolution, cluster.name = "unintegrated_clusters")
 sobj <- RunUMAP(sobj, dims = 1:pcs_chosen, reduction = "pca", reduction.name = "umap.unintegrated")
 
-
+# 5. plot biological and technical variables
 # plot clusters vs samples
 p = DimPlot(sobj, reduction = "umap.unintegrated", group.by = "unintegrated_clusters", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "orig.ident", raster = F, label = T)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-samples_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs batches
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Batch", "batch")
 p = DimPlot(sobj, reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "batch", raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-batches_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs subtypes
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Subtype", "subtype")
 p = DimPlot(sobj, group.by = "unintegrated_clusters", reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "subtype", raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-subtypes_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs subclass
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Subclass", "subclass")
 p = DimPlot(sobj, group.by = "unintegrated_clusters", reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "subclass", raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-subclass_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs subclass (classifier)
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Subclass (classifier)", "subclass_bc")
 p = DimPlot(sobj, group.by = "unintegrated_clusters", reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "subclass_bc", raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-subclass-bc_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs age
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Age at resection", "age_at_resection")
 p = DimPlot(sobj, group.by = "unintegrated_clusters", reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   FeaturePlot(sobj, reduction = "umap.unintegrated", features = "age_at_resection", pt.size = 0.5, cols = c("#00CCFF", "#CC0000"), raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-age_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs recurrence status
 sobj = add_annotation_from_excelsheet(sobj, metadata, "Rec", "recurrence")
 p = DimPlot(sobj, group.by = "unintegrated_clusters", reduction = "umap.unintegrated", label = T, raster = F) + NoLegend() + ggtitle("clusters.ident") + 
   DimPlot(sobj, reduction = "umap.unintegrated", group.by = "recurrence", raster = F)
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-recurrence_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
-
 # plot clusters vs patients
 metadata$patient_id = sub("(\\d+)[A-Za-z].*$", "\\1", metadata$`Study ID`)
 sobj = add_annotation_from_excelsheet(sobj, metadata, "patient_id", "patients")
@@ -98,6 +216,7 @@ p = DimPlot(sobj, reduction = "umap.unintegrated", group.by = "unintegrated_clus
 ggsave(filename = paste0("umap_unintegrated_clusters-vs-patients_res", cluster_resolution, "_pcs", pcs_chosen, ".png"), plot = p, width = 20, height = 9, path = unintegrated_clust_dir)
 
 
+# ---------------------- PART 5: INTEGRATE OBJECTS -------------------- 
 # -- Quality control BEFORE integration --
 # 1. investigate distribution of high expressing cells. Expected for proliferating and undiff. tumor cells. Otherwise an indication for technical sequencing doublets!
 p = FeaturePlot(sobj, reduction = "umap.unintegrated", features = "nFeature_RNA", raster = F)
