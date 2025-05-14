@@ -202,5 +202,6 @@ subtype_cols = c(ZFTA = "#3969AC", SE = "#c73210", YAP1 = "#e3d536", PLAGL1 = "#
 subclass_cols = c(ZFTA_RELA="#003967", ZFTA_NC="#66C5CC", ST_SE="#F97B72", SP_SE="#bd6908", YAP1="#e3d536", PLAGL1="#b0977b")
 mp_cols = c(Stress="#F2B701", Hypoxia="#3969AC", Cilia="#ff918a", 'Cilia-reg'="#11A579", Astroglial="#6d2c6e", 'Cell-cycle'="#ffe39e", 
             'ZFTA-fus'="#66C5CC", NPC="#EF4868", Respiration="#748cab", 'ECM-remod'="#bd6908", Wounded="#d5bdaf", 'Interferon-re'="#80BA5A")
-st_mp_cols = c(Stress="#F2B701", Hypoxia="#3969AC", Cilia="#ff918a", Glial="#11A579", Astroglial="#6d2c6e", Fibroblast="#542f3d", 
-               'ZFTA-fus'="#66C5CC", 'Cell-cycle'="#EF4868", Myeloid="#f5bfd3", Vasc="#ffe39e", Inflammatory="#d5bdaf", 'Interferon-re'="#80BA5A")
+st_mp_cols = c(Stress="#F2B701", Hypoxia="#3969AC", Cilia="#ff918a", Glial="#11A579", Astroglial="#6d2c6e", Fibroblast="#bd6908", 
+               'ZFTA-fus'="#66C5CC", 'Cell-cycle'="#ffe39e", Myeloid="#f5bfd3", Vasc="#d5bdaf", Inflammatory="#EF4868", 'Interferon-re'="#80BA5A")
+
