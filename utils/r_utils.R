@@ -65,3 +65,18 @@ compare_jaccard_ref_vs_sig = function(sig, reference_sig) {
   }
   return(m)
 }
+
+reorder_excel_sheet_columns = function(file, sheets, order) {
+  wb <- loadWorkbook(file)
+  for (sheet in sheets) {
+    sheet_data <- readWorkbook(wb, sheet = sheet)
+    sheet_data <- sheet_data[, order]
+    writeData(wb, sheet = sheet, x = sheet_data, startCol = 1, startRow = 1, colNames = TRUE)
+  }
+  saveWorkbook(wb, file, overwrite = TRUE)
+}
+
+
+
+
+                                                                                               
