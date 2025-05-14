@@ -44,3 +44,24 @@ enrich_signatures_GO_differential = function(sig_df, out_dir = NULL, save_combin
     }
   }
 }
+
+jaccard <- function(a, b) {
+  intersection = length(intersect(a, b))
+  union = length(a) + length(b) - intersection
+  return (intersection/union*100)
+}
+
+compare_jaccard_ref_vs_sig = function(sig, reference_sig) {
+  m = matrix(ncol = length(sig), nrow = length(reference_sig))
+  colnames(m) = if (is.data.frame(sig)) { colnames(sig) } else { names(sig) }
+  rownames(m) = if (is.data.frame(reference_sig)) { colnames(reference_sig) } else { names(reference_sig) }
+  i = 1; j = 1;
+  for (s in sig) {
+    for (ref_s in reference_sig) {
+      m[j, i] = jaccard(s, ref_s)
+      j = j + 1
+    }
+    j = 1; i = i + 1
+  }
+  return(m)
+}
