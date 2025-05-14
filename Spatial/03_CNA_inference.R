@@ -9,7 +9,7 @@ library(circlize)
 library(RColorBrewer)
 
 source("utils/r_utils.R")
-source("spatial_utils.R")
+source("utils/seurat_utils.R")
 
 
 # ------ PART 1: infer CNAs ------
