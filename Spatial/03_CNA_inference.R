@@ -11,6 +11,9 @@ library(RColorBrewer)
 source("utils/r_utils.R")
 source("spatial_utils.R")
 
+
+# ------ PART 1: infer CNAs ------
+
 gene_positions <- read.table("gene_ordering.txt", header = T)
 cna_cols = c("#F2B701","#3969AC","#EF4868","#11A579","#6d2c6e","#ffe39e","#bd6908","#66C5CC","#ff918a","cyan2","#ffea03","#80BA5A","#D4D915","#d5bdaf",
              "#CF1C90","#4b4b8f","#B95FBB","#748cab","yellow","grey","#ebc5ae","brown","#bab475","#4e81a3","#967bad", "#542f3d","#f5bfd3","#adf590","#e3d536","#cb1adb")
@@ -135,3 +138,53 @@ run_infercnv_spatial = function(s, input_dir, out_dir, inner_cores, gene_positio
     }
   }
 }
+
+
+# ------ PART 2: correlate CNAs to NMF programs ------
+
+metaprograms = readxl::read_excel("spatial_NMF_metaprograms_main.xlsx", sheet = "MP genes (final)")
+# extract and prepare data from every inferCNV object (only first time)
+raw_mscore_cors_per_mp = list()
+norm_mscore_cors_per_mp = list()
+avg_profile_cors_per_mp = list()
+for (s in sample_ids) {
+  message(">>> loading sample '", s, "' at [", format(Sys.time(), "%d.%m. %X"), "] <<<")
+  sstobj = readRDS(paste0("Objects/sstobj_", s, ".rds"))
+  infercnv_obj = readRDS(file.path("CNA inference", s, "run.final.infercnv_obj"))
+  norm_malignancy_score = readRDS(file.path("CNA inference", s, "malignancy_score_norm.rds"))
+  raw_malignancy_score = readRDS(file.path("CNA inference", s, "malignancy_score.rds"))
+  cna_mtx = infercnv_obj@expr.data # cna prediction matrix
+  cna_mtx = cna_mtx[, colnames(cna_mtx) %in% colnames(sstobj)]
+  # calculate correlation of MP scores and CNA malignancy score
+  norm_mscore_cors_per_mp[[s]] = sapply(1:ncol(metaprograms), function(i) cor(sstobj[[paste0("MP", i, "_mp-norm")]][names(norm_malignancy_score), ], norm_malignancy_score))
+}
+saveRDS(norm_mscore_cors_per_mp, file = "Data/norm_malignancy_vs_mp_scores_correlation_per_sample.rds")
+
+# relate normalised malignancy score to MPs
+norm_mscore_cors_per_mp = readRDS("Data/norm_malignancy_vs_mp_scores_correlation_per_sample.rds")
+data <- do.call(rbind, norm_mscore_cors_per_mp); colnames(data) = colnames(metaprograms)
+data <- reshape2::melt(data); colnames(data) <- c("sample", "metaprogram", "correlation")
+mean_scores = data %>% group_by(metaprogram) %>% summarise(mean_cor = mean(correlation, na.rm = TRUE)) %>% arrange(desc(mean_cor))
+data <- data %>% mutate(metaprogram = factor(metaprogram, levels = mean_scores$metaprogram))
+data$subtype = metadata$Subtype[match(data$sample, metadata$`Study ID`)]
+
+# a. ggpubr version:
+ggviolin(data, x = "metaprogram", y = "correlation", add = "boxplot", fill = "metaprogram", palette = st_mp_cols, add.params = list(fill = "white")) + labs(x = "metaprogram", y = "correlation to malignancy score") # + stat_compare_means(method = "t.test", label = "p.format", comparisons = NULL) # Global significance across groups
+ggsave(filename = "01a_violin_norm-malignancy-score_vs_MP_score_correlation.png", width = 9, height = 5, path = out_dir)
+# # split by subtype:
+# ggviolin(data, x = "metaprogram", y = "correlation", add = "boxplot", fill = "metaprogram", palette = cna_cols, add.params = list(fill = "white")) + 
+#   labs(x = "metaprogram", y = "correlation to malignancy score") + # stat_compare_means(method = "t.test", label = "p.format", comparisons = NULL) # Global significance across groups
+#   facet_wrap(~subtype)
+# ggsave(filename = "01b_violin_malignancy-score_vs_MP_score_correlation_split-by-subtype.png", width = 12, height = 8, path = out_dir)
+# b. ggbetweenstats version:
+ggbetweenstats(data, metaprogram, correlation, type = "parametric", pairwise.display = "none", p.adjust.method = "holm", mean.plotting = TRUE,
+               mean.ci = TRUE, messages = FALSE, violin.args = list(width = 1, alpha = 0), boxplot.args = list(alpha = 0, width = 0.2), 
+               point.args = list(position = ggplot2::position_jitterdodge(dodge.width = 1), alpha = 1, size = 1.5)) + theme_classic() +
+  scale_color_manual(values = st_mp_cols) + labs(title = "Violin Plot of Mscore by Metaprogram", x = "metaprogram", y = "correlation to malignancy score")
+ggsave(filename = "01b_violin_norm-malignancy-score_vs_MP_score_correlation.png", width = 12, height = 8, path = out_dir)
+
+
+
+
+
+                             
