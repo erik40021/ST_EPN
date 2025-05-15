@@ -8,7 +8,9 @@ sobj = readRDS(file = "Objects/ST_EPN.rds")
 out_dir = "Main analysis/Clustering"; if (!dir.exists(out_dir)) dir.create(out_dir, r = T)
 
 
-# ---------------- PART 1: cluster annotation, malignancy classification, and labeling -------------------
+
+# ---------------- PART 1: cluster annotation, malignancy classification, and labeling of integrated object -------------------
+
 p = DimPlot(sobj, reduction = "umap.rpca", label = TRUE, label.size = 7, raster = F) + NoLegend()
 ggsave(filename = paste0("00_umap_rpca_numbered.png"), plot = p, width = 14, height = 10, path = out_dir)
 
@@ -46,7 +48,7 @@ p = plot_cluster_composition(sobj, "orig.ident", ref_candidates)
 ggsave(filename = paste0("06b_barplot_TME-cluster_compositions_by_sample.png"), plot = p, width = 10, height = 8, path = out_dir)
 
 # v) infer CNAs per cell, derive malignancy score, and cluster CNAs
-# >>> run inferCNV on server <<<
+# >>> follow '03_CNA_inference.R' <<<
 
 # vi) transfer CNA inference results to object
 non_malignant_clusters = c(1, 13, 15, 17, 20, 21, 22, 24, 25, 27, 28) # result of CNA inference and cluster annotation based malignancy classification 
@@ -88,12 +90,6 @@ ggsave(filename = paste0("02_heatmap_TME_top100-degs_custom.png"), plot = p, wid
 # viii) save integrated object after adding all previous labels
 saveRDS(sobj, "Objects/ST_EPN.rds")
 
-# ix) subset malignant object according to classification and save for malig analysis
-malig_sobj = subset(sobj, cells = rownames(sobj@meta.data[sobj$malignant == "malignant", ]))
-malig_sobj@project.name = "ST-EPN_malig"
-saveRDS(malig_sobj, "Objects/ST_EPN_malig.rds")
-
-
 
 # ---------------- PART 2: compare subtype differences -------------------
 
@@ -116,4 +112,54 @@ sapply(c("ZFTA", "SE", "YAP1"), function(st) mean(data_hvg[data_hvg$group == st,
 sapply(c("ZFTA", "SE", "YAP1"), function(st) mean(data_hvg[data_hvg$group == st, ]$log_vars))
 
 
+
        
+# ---------------- PART 3: subset malignant cells, and process and cluster -------------------
+       
+# subset malignant object according to prior classification
+malig_sobj = subset(sobj, cells = rownames(sobj@meta.data[sobj$malignant == "malignant", ]))
+
+# --- 1. re-do default pre-processing on new subset of cells ---
+malig_sobj <- NormalizeData(malig_sobj)
+malig_sobj <- FindVariableFeatures(malig_sobj)
+malig_sobj <- ScaleData(malig_sobj)
+malig_sobj <- RunPCA(malig_sobj, verbose = FALSE)
+pcs_chosen = 30; cluster_resolution = 0.6
+malig_sobj <- FindNeighbors(malig_sobj, reduction = "pca", dims = 1:pcs_chosen)
+malig_sobj <- FindClusters(malig_sobj, resolution = cluster_resolution, cluster.name = "unintegrated_clusters")
+malig_sobj = RunUMAP(malig_sobj, reduction = "pca", dims = 1:pcs_chosen, reduction.name = "umap.unintegrated")
+
+# --- 2. re-do batch integration and integration-based clustering and UMAP ---
+malig_sobj$RNA <- split(malig_sobj$RNA, f = malig_sobj$batch) # split into technical processing batches
+anchors = 5
+reduction_name = "bat.integrated.rpca" # name of new batch integration
+options(future.globals.maxSize = 28000 * 1024^2)
+malig_sobj = IntegrateLayers(malig_sobj, method = RPCAIntegration, k.anchor = anchors, orig.reduction = "pca", new.reduction = reduction_name, verbose = T)
+pcs_chosen = 30; cluster_resolution = 0.6
+malig_sobj <- FindNeighbors(malig_sobj, reduction = "bat.integrated.rpca", dims = 1:pcs_chosen)
+malig_sobj <- FindClusters(malig_sobj, resolution = cluster_resolution, cluster.name = "bat.rpca_clusters")
+malig_sobj = RunUMAP(malig_sobj, reduction = "bat.integrated.rpca", dims = 1:pcs_chosen, reduction.name = "umap.bat.rpca")
+malig_sobj$seurat_clusters = malig_sobj$bat.rpca_clusters
+
+malig_sobj = JoinLayers(malig_sobj)
+saveRDS(malig_sobj, "ST_EPN_malig.rds")
+
+
+
+# ---------------- PART 4: Transfer metaprograms to Seurat object and score cells ---------------
+       
+# requires finished NMF program identification
+# # >>> for that follow '04_NMF_programs.R' <<<
+  
+# assign each cell to one MP
+mps = openxlsx::read.xlsx("NMF_metaprograms_main.xlsx"), sheet = "MP genes (final)")
+mp_list = lapply(mps, function(col) col)
+malig_sobj = Seurat::AddModuleScore(malig_sobj, features = mp_list, name = "MP") # add expression scores of each MP to each cell
+malig_sobj = assign_cells_by_max_score(malig_sobj, score_names = paste0("MP", 1:length(mp_list)), meta_data_entry_name = "metaprogram")
+levels(malig_sobj$metaprogram) = names(mp_list) # rename 'metaprogram' metadata entry
+
+p = DimPlot(malig_sobj, reduction = "umap.bat.rpca", label = T, raster = F) + NoLegend() + DimPlot(malig_sobj, reduction = "umap.bat.rpca", group.by = "metaprogram", cols = mp_cols, raster = F)
+ggsave(filename = "01_umap_metaprograms.png", plot = p, width = 20, height = 10, path = seurat_out_dir)
+
+
+
