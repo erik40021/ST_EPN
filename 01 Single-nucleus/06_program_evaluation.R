@@ -13,7 +13,7 @@ out_dir = "MP evaluation"; if (!dir.exists(out_dir)) dir.create(out_dir)
 
 # ------ PART 1: evaluate metaprograms regarding favourable and unfavourable genes ------
 
-# favourability of single genes was downloaded from R2-Browser with Korshunov bulk ZFTA transcriptomes (via PAGE enrichment in fav. vs. unfav. samples)
+# favourability of single genes was downloaded from R2-Browser with Korshunov et al. bulk ZFTA transcriptomes (via PAGE enrichment in fav. vs. unfav. samples)
 gene_favs = read.table(file.path(out_dir, "/all_genes_enrichment.txt"))[, 2:4]; colnames(gene_favs) = c("gene", "pval_adj", "log2fc")
 gene_favs$gene = gsub("ORF", "orf", gene_favs$gene)
 data <- mps %>% pivot_longer(cols = everything(), names_to = "mp", values_to = "gene") %>% filter(!is.na(gene))
