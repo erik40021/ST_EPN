@@ -28,7 +28,12 @@ metadata = readxl::read_excel("K:/PHO/AG Kerl/Erik/ST-EPN/Cohort/masterlist_EPN-
 
 # ------------------ part 0: Run NMF for every sample --------------------------
 # recommended to be run on server and in parallel
-obj_paths = paste0("Objects/sstobj_", sample_ids, ".rds")
+sobj = readRDS("ST_EPN_malig.rds")
+for (s in unique(sobj$orig.ident)) {
+  subset_obj = subset(sobj, subset = orig.ident == s)
+  saveRDS(subset_obj, paste0("malig_subset_sobj_", s, ".rds"))
+}
+obj_paths = paste0("malig_subset_sobj_", sample_ids, ".rds")
 # to run locally: res = lapply(obj_paths, run_NMF(sobj_path, out_path, range = 2:20, n_features = 5000))
 
 
