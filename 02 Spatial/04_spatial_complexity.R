@@ -20,7 +20,7 @@ cloud_path = ""
 metadata = read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("2", metadata$`Analyses*`), ]
 sample_ids = metadata$`Study ID`
 
-base_dir = "Spatial scoring/Complexity"; if (!dir.exists(base_dir)) dir.create(base_dir, r = T)
+base_dir = ""
 metaprograms = readxl::read_excel("spatial_NMF_metaprograms_main.xlsx", sheet = "MP genes (final)")
 mp_names = colnames(metaprograms)
 win_sizes = c(5, 8, 11)
@@ -82,8 +82,7 @@ names(complexity_win_combined) = sample_ids
 saveRDS(complexity_win_combined, file.path(base_dir, "complexity_win_combined.rds"))
                               
 # 1.3 plot coherence and complexity scores in tissue. first by program, then merged
-out_dir = file.path(base_dir, "02 Scores plots"); if (!dir.exists(out_dir)) dir.create(out_dir, r = T)
-all_coh_plots = c(); all_cplx_plots = c()
+out_dir = ""
 for (s in sample_ids) {
   message("plotting scores in tissue of ", s)
   sstobj = readRDS(file = paste0("Objects/sstobj_", s, ".rds")) # takes a while bc. every object is loaded here...
@@ -102,37 +101,13 @@ for (s in sample_ids) {
   gr_plots = lapply(gr_plots, function(p) p + scale_fill_gradientn(colors = Seurat:::SpatialColors(n = 100), limits = c(0, global_gr_max)))
   ggsave(filename = paste0(s, "_b_spatial_complexity.png"), plot = wrap_plots(gr_plots, ncol = 5), width = 20, height = 10, path = out_dir)
 
-  # a) merge scores across programs by mean
-  sstobj$coherence = apply(coherence[[s]], 1, function(x) mean(x, na.rm = T))
-  co1 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "coherence", image.scale = NULL) + ggtitle("mean coherence") + theme(legend.position = "right", aspect.ratio = ratio)
-  sstobj$complexity = apply(complexity_win_combined[[s]], 1, function(x) mean(x, na.rm = T))
-  cplx1 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "complexity", image.scale = NULL) + ggtitle("mean complexity") + theme(aspect.ratio = ratio)
-  # b) merge scores across programs by max
+  # merge scores across programs by max
   sstobj$coherence = apply(coherence[[s]], 1, function(x) max(x, na.rm = T))
-  co2 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "coherence", image.scale = NULL) + ggtitle("max coherence") + theme(legend.position = "right", aspect.ratio = ratio)
+  co = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "coherence", image.scale = NULL) + ggtitle("max coherence") + theme(legend.position = "right", aspect.ratio = ratio)
   sstobj$complexity = apply(complexity_win_combined[[s]], 1, function(x) max(x, na.rm = T))
-  cplx2 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "complexity", image.scale = NULL) + ggtitle("max complexity") + theme(aspect.ratio = ratio)
-  # c) merge scores across programs by using normalised spot comp scores as weights
-  # sstobj$coherence = sapply(1:nrow(coherence[[s]]), function(i) sum(coherence[[s]][i, ] * all_spots_norm_comp[[s]][i, ]))
-  # co3 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "coherence", image.scale = NULL) + ggtitle("weighted coherence") + theme(aspect.ratio = ratio)
-  # sstobj$complexity = sapply(1:nrow(complexity_win_combined[[s]]), function(i) sum(complexity_win_combined[[s]][i, ] * all_spots_norm_comp[[s]][i, ]))
-  # gr3 = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "complexity", image.scale = NULL) + ggtitle("weighted complexity") + theme(aspect.ratio = ratio)
-  # ggsave(filename = paste0("all_merged_scores_", s, ".png"), plot = wrap_plots(co1,co2,co3,cplx1,cplx2,gr3, nrow = 2), width = 15, height = 10, path = out_dir)
-  ggsave(filename = paste0(s, "_c_spatial_scores_summary.png"), plot = (co1/co2|cplx1|cplx2) + plot_layout(widths = c(1,3,3)), width = 20, height = 10, path = out_dir)
-  all_coh_plots[[s]] = co2; all_cplx_plots[[s]] = cplx2
+  cplx = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "complexity", image.scale = NULL) + ggtitle("max complexity") + theme(aspect.ratio = ratio)
+  ggsave(filename = paste0(s, "_c_spatial_scores_summary.png"), plot = (co|cplx), width = 20, height = 10, path = out_dir)
 }
-# saveRDS(all_coh_plots, file.path(base_dir, "coherence_plots_max.rds")); saveRDS(all_cplx_plots, file.path(base_dir, "complexity_plots_max.rds"))
-# also plot overview showing max scores of all samples, ordered by mean score
-# all_cplx_plots = readRDS(file.path(base_dir, "complexity_plots_max.rds"))
-cplx_order = sapply(complexity_win_combined, function(s) mean(rowMeans(s), na.rm = T)); cplx_order = cplx_order[order(cplx_order, decreasing =  T)]
-max_cplx = max(sapply(complexity_win_combined, max, na.rm = T))
-
-cplx_plots = lapply(names(cplx_order), function(s) all_cplx_plots[[s]] + ggtitle(s) + theme(plot.title = element_text(hjust = 0.5, size = 15), legend.position = "right") +
-    scale_fill_gradientn(colors = Seurat:::SpatialColors(n = 100), limits = c(NA, max_cplx)))
-ggsave("00x_legend_max-complexity_all_samples.png", plot = cplx_plots[[1]], width = 5, height = 5, path = base_dir)
-cplx_plots = lapply(cplx_plots, function(p) p + NoLegend())
-ggsave("00a_max-complexity_all_samples_small.png", plot = wrap_plots(cplx_plots, ncol = 8), width = 15, height = 7.5, path = base_dir)
-
 coherences_prog_max_combined = lapply(coherence, function(s_df) { apply(s_df, 1, max) })
 saveRDS(coherences_prog_max_combined, file.path(base_dir, "coherence_max_combined.rds"))
 
@@ -207,7 +182,7 @@ ggsave("04a_mean_MP_complexity_by_sample_comparing-hyp-class_ordered-by-diff.png
 p = plot_mean_score_comparative(complexity_win_combined, split.by = hyp_class, pair = c("hyp_high", "hyp_low"), order_by_difference = F, cols = c(hyp_high = "black", hyp_low = "#e3d536"))
 ggsave("04b_mean_MP_complexity_by_sample_comparing-hyp-class_ordered-by-hyp-high-cplx.png", plot = p, width = 4.5, height = 3, path = base_dir)
 
-# iv) do statistics on observed differences between hyp classes
+# iv) statistics on observed differences between hyp classes
 data_cplx$hyp_class = hyp_class[match(data_cplx$sample, names(hyp_class))]; data_cplx$hyp_score = hyp_score[match(data_cplx$sample, names(hyp_score))]
 # condensed data (one row per sample)
 data = data_cplx %>% distinct(sample, .keep_all = T); data = data[, c(3,4,6,7)]
@@ -248,6 +223,7 @@ complexity_zones = sapply(sample_ids, function(s) {ifelse(complexity_prog_max_co
                                                                         "structured_high")))})                                               # 76-100%
 smoothing_win_size = 4
 # smoothes by majority of neighbouring spots: 'clear' structured or disorganised zones: > 60% of spots classified accordingly, mixed zones: > 40% of both structured and disorganised zones
+# smoothing approach adapted from Greenwald et al. 24
 all_zones_smoothened = lapply(sample_ids, function(s) {
   message("smoothing of zones in ", s, " using 'smoothing_win_size' = ", smoothing_win_size)
   neighbors_table = neighbors_table_funcV2(all_spots_positions[[s]], all_spots_programs_comp_norm[[s]]); neighbors_table[neighbors_table== "NaN"] = NA
@@ -294,7 +270,6 @@ out_dir = file.path(base_dir, "Zones vs. MPs"); if (!dir.exists(out_dir)) dir.cr
 # 3.1 use raw scores and a hard threshold to consider only spots with significant expression of a signature
 mp_zone_abund = lapply(sample_ids, function(s) { # simpler variant without significance testing
   mp_scores = all_spots_programs_comp[[s]]
-  # zone_abund = sapply(mp_names, function(mp) tapply(mp_scores[, mp], as.character(all_zones[[s]][rownames(mp_scores)]), mean))
   zone_abund = sapply(mp_names, function(mp) {
     tapply(mp_scores[, mp], as.character(all_zones[[s]][rownames(mp_scores)]), function(zone_spot_scores) sum(zone_spot_scores > 0.6))
   })
@@ -303,23 +278,10 @@ mp_zone_abund = lapply(sample_ids, function(s) { # simpler variant without signi
     if (!row_name %in% rownames(zone_abund)) { zone_abund = rbind(zone_abund, rep(0, ncol(zone_abund))); rownames(zone_abund)[nrow(zone_abund)] = row_name }
   }
   zone_abund = zone_abund[c("structured_high", "structured_low", "intermediate", "disorganised_low", "disorganised_high"), ] # bring in consistent order and remove 'intermediate'
-  # zone_abund = apply(zone_abund, 2, function(zones) zones / sum(zones)) # normalise to have sum = 1
-  # zone_abund[c(3,4), ] = -zone_abund[c(3,4), ] # negate disorganised values for visualisation
   return(zone_abund)
 }); names(mp_zone_abund) = sample_ids
 
 # 3.2 plot relative abundances of MPs in zones as barplots
 plots = plot_mp_zone_abundance(mp_zone_abund, zone.colors, ylim = c(0.8, 1.2))
-ggsave("01a_mean_abundance_in_zones.png", plot = plots[[1]], width = 5, height = 3, path = out_dir)
-plots = plot_mp_zone_abundance(mp_zone_abund, zone.colors, ylim = c(1, 1.3), split.by = subtype)
-ggsave("01b_mean_abundance_in_zones_split-by-subtype.png", plot = wrap_plots(plots, nrow = 1), width = 12, height = 3, path = out_dir)
-zfta_or_not = ifelse(metadata$Subtype == "ZFTA", "ZFTA", "non_ZFTA")
-plots = plot_mp_zone_abundance(mp_zone_abund, zone.colors, ylim = c(0.9, 1.3), split.by = zfta_or_not)
-ggsave("01c_mean_abundance_in_zones_split-by-ZFTA-vs-nonZFTA.png", plot = wrap_plots(plots, nrow = 1), width = 8, height = 3, path = out_dir)
-plots = plot_mp_zone_abundance(mp_zone_abund, zone.colors, ylim = c(0.9, 1.3), split.by = hyp_class)
-ggsave("01d_mean_abundance_in_zones_split-by-hyp-status.png", plot = wrap_plots(plots, nrow = 1), width = 12, height = 3, path = out_dir)
-# plot each sample individually
-by_sample_dir = file.path(out_dir, "by sample"); if (!dir.exists(by_sample_dir)) dir.create(by_sample_dir)
-plots = plot_mp_zone_abundance(mp_zone_abund, zone.colors, ylim = c(1, 1.1), split.by = sample_ids); names(plots) = sample_ids
-for (s in sample_ids) ggsave(paste0(s, "_mean_abundance_in_zones.png"), plot = plots[[s]], width = 6, height = 3, path = by_sample_dir)
+ggsave("01_mean_abundance_in_zones.png", plot = plots[[1]], width = 5, height = 3, path = out_dir)
 
