@@ -31,7 +31,7 @@ win_sizes = c(5, 8, 11)
 all_spots_positions = list(); all_spots_programs_comp_norm = list(); all_spots_programs_comp = list(); all_spots_programs_comp_spot_norm = list()
 for (s in sample_ids) {
   message("extracting data from ", s)
-  sstobj = readRDS(file = paste0("Objects/sstobj_", s, ".rds"))
+  sstobj = readRDS(file = paste0("sstobj_", s, ".rds"))
   raw_data_dir = file.path(cloud_path, metadata[metadata$`Study ID` == s, ]$`KK code`, "outs")
   spots_positions = read.csv(list.files(file.path(raw_data_dir, "spatial"), pattern = "tissue_positions.*\\.csv$", full.names = T), header = F, skip = 1)
   row.names(spots_positions) <- spots_positions$V1
@@ -43,10 +43,10 @@ for (s in sample_ids) {
   all_spots_positions[[s]] = spots_positions; all_spots_programs_comp_norm[[s]] = spots_programs_comp_norm; 
   all_spots_programs_comp[[s]] = spots_programs_comp; all_spots_programs_comp_spot_norm[[s]] = spots_programs_comp_spot_norm
 }
-saveRDS(all_spots_positions, file = file.path(base_dir, "../all_spots_positions.rds")) # <- used for all spatial scores
-saveRDS(all_spots_programs_comp_norm, file = file.path(base_dir, "../all_spots_programs_comp_norm.rds")) # <- used for complexity score and downstream analyses
-saveRDS(all_spots_programs_comp, file = file.path(base_dir, "../all_spots_programs_comp.rds")) # <- used for association and zone abundances (PART 3)
-saveRDS(all_spots_programs_comp_spot_norm, file = file.path(base_dir, "../all_spots_programs_comp_spot_norm.rds")) # <- used to define hyp-classes
+saveRDS(all_spots_positions, file = file.path(base_dir, "all_spots_positions.rds")) # <- used for all spatial scores
+saveRDS(all_spots_programs_comp_norm, file = file.path(base_dir, "all_spots_programs_comp_norm.rds")) # <- used for complexity score and downstream analyses
+saveRDS(all_spots_programs_comp, file = file.path(base_dir, "all_spots_programs_comp.rds")) # <- used for association and zone abundances (PART 3)
+saveRDS(all_spots_programs_comp_spot_norm, file = file.path(base_dir, "all_spots_programs_comp_spot_norm.rds")) # <- used to define hyp-classes
 
 
 # ------------------------------- PART 1: calculate spatial coherence and complexity -----------------------
@@ -58,16 +58,16 @@ saveRDS(coherence, file.path(base_dir, "coherence.rds"))
           
 # 1.2 calculate spatial complexity 
 # recommended to be run on server and in parallel
-scores_dir = file.path(base_dir, "01 Raw scores"); if (!dir.exists(scores_dir)) dir.create(scores_dir)
-# if running locally:
-# win_sizes = c(5, 8, 11); rand_num = 100
-# for (w in win_sizes) {
-#   all_scores = lapply(sample_ids, FUN = function(s) calculate_spatial_complexity(s, w, rand_num, mp_names)) # runs sequentially
-#   saveRDS(all_scores, paste0(base_dir, "/01_scores_w", w, ".rds"))
-# }
+# to run locally:
+win_sizes = c(5, 8, 11)
+rand_num = 100
+for (w in win_sizes) {
+  all_scores = lapply(sample_ids, function(s) calculate_spatial_complexity(s, w, rand_num, mp_names)) # runs sequentially
+  saveRDS(all_scores, paste0(base_dir, "/01_scores_w", w, ".rds"))
+}
 
 # load complexity scores of all samples
-complexity = lapply(sample_ids, function(s) readRDS(paste0(scores_dir, "/complexity_scores_", s, ".rds")))
+complexity = lapply(sample_ids, function(s) readRDS(paste0("complexity_scores_", s, ".rds")))
 names(complexity) = sample_ids
 
 # average across win_sizes
@@ -212,7 +212,7 @@ mp_hyp_pvals[order(mp_hyp_pvals)]
 
 
 # -------------------------------- PART 2: define structural zones ----------------------------                    
-out_dir = file.path(base_dir, "04 Structural zones"); if (!dir.exists(out_dir)) dir.create(out_dir, r = T)
+out_dir = ""
                              
 # 2.1 define structural zones based on max-combined spatial complexity scores per sample
 quantiles = as.numeric(quantile(na.omit(unlist(complexity_prog_max_combined)), probs = (seq(0, 1, 0.05))))
@@ -265,7 +265,7 @@ for (s in sample_ids) {
 
 
 # ---------------------- PART 3: investigate MP abundance in structural zones --------------------
-out_dir = file.path(base_dir, "Zones vs. MPs"); if (!dir.exists(out_dir)) dir.create(out_dir, r = T)
+out_dir = ""
 
 # 3.1 use raw scores and a hard threshold to consider only spots with significant expression of a signature
 mp_zone_abund = lapply(sample_ids, function(s) { # simpler variant without significance testing
