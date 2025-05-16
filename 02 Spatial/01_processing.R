@@ -5,9 +5,9 @@ library(pals)
 library(RColorBrewer)
 library(readxl)
 
-cloud_path = ""
 source("utils/seurat_utils.R")
 source("utils/spatial_utils.R")
+source("utils/spatial_scoring_utils.R") # (for smoothing of necrosis score)
 
 
 metadata = readxl::read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[grepl("2", metadata$`Analyses*`), ]
@@ -28,12 +28,12 @@ necrosis_threshold = 0.01
 smoothing_win_size = 3
 # --------------------------------------------------
 
-options(future.globals.maxSize = 1000 * 1024^2) # increase RAM limit for SCTransform function for big samples
+options(future.globals.maxSize = 1000 * 1024^2) # increase RAM limit for SCTransform of big samples
 for (s in sample_ids) {
   message(">>> starting Seurat pipeline for sample '", s, "' at [", format(Sys.time(), "%d.%m. %X"), "] <<<")
-  raw_data_dir = file.path(cloud_path, metadata[metadata$`Study ID` == s, ]$`KK code`, "outs")
-  out_dir = file.path("Samples", s)
-  degs_dir = file.path(out_dir, "DEGs"); if(!file.exists(degs_dir)) dir.create(degs_dir, recursive = T)
+  raw_data_dir = file.path("", s, "outs")
+  out_dir = file.path("", s)
+  degs_dir = file.path(out_dir, ""); if(!file.exists(degs_dir)) dir.create(degs_dir, recursive = T)
   
   sstobj = Load10X_Spatial(raw_data_dir, filename = "filtered_feature_bc_matrix.h5", slice = "tissue_lowres_image")
   sstobj@project.name = s; sstobj$orig.ident = s; Idents(sstobj) = sstobj$orig.ident
