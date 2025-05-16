@@ -1,5 +1,4 @@
-# ST_EPN overview
-Source code for Schüftan et al. 2025
+# Source code for Schüftan et al. 2025
 
 This repository contains all code developed for the study "Integrated dual-omics analysis elucidates transcriptional heterogeneity and hypoxia-driven spatial organisation in supratentorial ependymoma".
 
