@@ -91,10 +91,6 @@ for (pair in rownames(avg_association)) {
   png(paste0(out_dir, "/target_all_proximities_", pair, ".png"), width = 2000, height = 1500, res = 300)
   target_plot(data, radii = "all")
   dev.off()
-  data <- data.frame(score = unlist(avg_association[pair, 16:1]), radius = rev(c(1.2, 3, 5, 7.5)))
-  png(paste0(out_dir, "/target_selected_proximities_", pair, ".png"), width = 2000, height = 1500, res = 300)
-  target_plot(data, radii = "selected")
-  dev.off()
 }
 # ii. stacked pairs (39 per plot) for overview
 avg_association_ordered = avg_association[order(rowMeans(avg_association, na.rm = T), decreasing = T), ]
