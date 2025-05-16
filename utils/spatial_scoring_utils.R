@@ -1,6 +1,6 @@
 # all utility functions needed to calculate spatial scores
 
-# ------ PART 1: spatial complexity and coherence functions ------
+# ------------------------------------------- PART 1: spatial complexity and coherence functions --------------------------------------------------
 
 # calculates spatial gradients for a given sample and window size (-> main, most time-intensive scoring function, recommended to run on HPC)
 calculate_spatial_complexity = function(s, w, rand_num, inner_cores) {
@@ -552,16 +552,13 @@ plot_mp_zone_abundance = function(mp_zone_abund, zone_cols, ylim = c(1, 1), spli
 
 
                                     
-# ------ PART 2: spatial association functions ------
+# ---------------------------------------------- PART 2: spatial association functions ----------------------------------------------------
 
 
-# -----> run on server for higher win_size and rand number <------
-calculate_association = function(s, mp_names, pairs, pairs_names, spots_positions, spots_programs_comp, out_dir, max_win_size = 15, rand_num = NULL) {
+# calculates pairwise associations for all given pairs of programs across given distances by correlation of expression
+calculate_association = function(s, mp_names, pairs, pairs_names, spots_positions, spots_programs_comp, out_dir, max_win_size = 15) {
   message("calculating pairwise association across distances: 0-", max_win_size, " in ", s)
-
-  # spots_programs_comp = all_spots_programs_comp[[s]]
   neighbors_table <- neighbors_table_funcV2(spots_positions, spots_programs_comp)
-  
   all_cors = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size + 1)); all_pvals = all_cors
   for (w in 0:max_win_size) {
     peri_abund = get_perimeter_abund(spots_programs_comp, neighbors_table, mp_names, w)
@@ -575,248 +572,7 @@ calculate_association = function(s, mp_names, pairs, pairs_names, spots_position
   rownames(all_cors) <- pairs_names; rownames(all_pvals) = pairs_names
   all_association = list(all_cors, all_pvals)
   saveRDS(all_association, paste0(out_dir, "/", s, "_obs_association_w", max_win_size, ".rds"))
-  
-  if (!is.null(rand_num)) { # run the same for random positions
-    message("calculating reference regional composition in ", s, " for ", rand_num, " randomly shuffled spot positions")
-    all_rand <- lapply(1:rand_num, function(z) {
-      new_pos_all <- sample(spots_positions$V1[spots_positions$V2 != 0], length(spots_positions$V1[spots_positions$V2 != 0]), replace = FALSE)
-      new_spots_positions <- spots_positions
-      new_spots_positions$V1[new_spots_positions$V2 != 0] <- new_pos_all
-
-      neighbors_table <- neighbors_table_funcV2(new_spots_positions, spots_programs_comp)
-
-      all_windows <- sapply(0:max_win_size, function(w) {
-        association = get_perimeter_abund(spots_programs_comp, neighbors_table, mp_names, w)
-        # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-        empty_win_spots = is.na(association[, 1])
-        all_cor <- sapply(1:dim(pairs)[2], function(j) {
-          a = spots_programs_comp[!empty_win_spots, pairs[2, j]]
-          b = association[!empty_win_spots, pairs[1, j]]
-          return(cor(a, b))
-        })
-        all_cor <- data.frame(pair_cors = all_cor); row.names(all_cor) <- pairs_names
-        return(all_cor)
-      })
-      sample_association <- as.data.frame(all_windows); row.names(sample_association) <- pairs_names
-      return(sample_association)
-    })
-    sample_mean_rand_prox <- Reduce("+", all_rand) / length(all_rand)
-    sample_sd_rand_prox <- round(apply(array(unlist(all_rand), c(length(pairs_names), max_win_size, rand_num)), c(1,2), sd),4)
-    message("saving reference association in ", s, " (", nrow(spots_programs_comp), " spots)")
-    saveRDS(list(sample_mean_rand_prox, sample_sd_rand_prox), paste0(out_dir, "/", s, "_reference_regional_association_w", max_win_size, "_rand", rand_num, ".rds"))
-    message("finished calculating reference association in ", s, " (", nrow(spots_programs_comp), " spots)")
-  }
 }
-
-
-calculate_association_by_ratio = function(s) { # -----> run on server for higher win_size and rand number <------
-  message("calculating pairwise association in regional composition in ", s, " using 'max_win_size' = ", max_win_size)
-  
-  all_spot_progs = all_spots_programs_comp[[s]]
-  neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-  all_associations = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size + 1))
-  for (w in 0:max_win_size) {
-    association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-    # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-    all_associations[, w+1] = sapply(1:dim(pairs)[2], function(j) {
-      spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_b = association[, pairs[1, j]]
-      association_by_ratio = mean(sapply(1:length(spot_prog_a), function(i) {
-        ratio = spot_prog_a[i] / neighbours_prog_b[i]; association = (1 - abs((ratio - 1) / (ratio + 1)))
-        return(association)
-      }), na.rm = T)
-      return(association_by_ratio)
-    })
-  }
-  rownames(all_associations) <- pairs_names
-  saveRDS(all_associations, paste0(out_dir, s, "_obs_association_by_ratio_w", max_win_size, ".rds"))
-  
-  # run the same for random positions 
-  # message("calculating reference regional composition in ", s, " for ", rand_num, " randomly shuffled spot positions")
-  # all_rand <- lapply(1:rand_num, function(z) {
-  #   new_pos_all <- sample(all_spots_positions[[s]]$V1[all_spots_positions[[s]]$V2 != 0], length(all_spots_positions[[s]]$V1[all_spots_positions[[s]]$V2 != 0]), replace = FALSE)
-  #   spots_positions <- all_spots_positions[[s]]
-  #   spots_positions$V1[spots_positions$V2 != 0] <- new_pos_all
-  #   
-  #   neighbors_table <- neighbors_table_funcV2(spots_positions, all_spot_progs)
-  #   
-  #   all_windows <- sapply(0:max_win_size, function(w) {
-  #     association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-  #     # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-  #     empty_win_spots = is.na(association[, 1])
-  #     all_associations <- sapply(1:dim(pairs)[2], function(j) {
-  #       spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_b = association[, pairs[1, j]]
-  #       association_by_ratio = mean(sapply(1:length(spot_prog_a), function(i) {
-  #         ratio = spot_prog_a[i] / neighbours_prog_b[i]; association = (1 - abs((ratio - 1) / (ratio + 1)))
-  #         return(association)
-  #       }), na.rm = T)
-  #       return(weighted_association)
-  #     })
-  #     all_associations <- data.frame(pair_cors = all_associations); row.names(all_associations) <- pairs_names
-  #     return(all_associations)
-  #   })
-  #   sample_association <- as.data.frame(all_windows); row.names(sample_association) <- pairs_names
-  #   return(sample_association)
-  # })
-  # sample_mean_rand_prox <- Reduce("+", all_rand) / length(all_rand)
-  # sample_sd_rand_prox <- round(apply(array(unlist(all_rand), c(length(pairs_names), max_win_size, rand_num)), c(1,2), sd),4)
-  # message("saving reference association in ", s, " (", nrow(all_spot_progs), " spots)")
-  # saveRDS(list(sample_mean_rand_prox, sample_sd_rand_prox), paste0(out_dir, s, "_reference_regional_association_w", max_win_size, "_rand", rand_num, ".rds"))
-  # message("finished calculating reference association in ", s, " (", nrow(all_spot_progs), " spots)")
-}
-
-# calculates (only) the average gradients per pair of programs and per distance
-calculate_pairwise_gradients = function(s, gradient = 1) {
-  message("calculating ", if (gradient == 1) "first" else "second", " gradients in ", s, " using 'max_win_size' = ", max_win_size)
-  all_spot_progs = all_spots_programs_comp[[s]]
-  neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-  all_cors = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size+1))
-  for (w in 0:max_win_size) {
-    # association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-    gradients = if (gradient == 1) prog_gradients_win_combined[[s]] else derivatives[[s]] # chooses between first or second derivative
-    neighbour_gradients = find_gradients(all_spot_progs, neighbors_table, mp_names, w, gradients)
-    # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-    all_res <- sapply(1:dim(pairs)[2], function(j) {
-      # spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_b = association[, pairs[1, j]]
-      spot_gradient_a = gradients[, pairs[2, j]]; neighbours_gradient_b = neighbour_gradients[, pairs[1, j]]
-      gradients = mean(sapply(1:length(spot_gradient_a), function(i) { spot_gradient_a[i] * neighbours_gradient_b[i] }), na.rm = T)
-      return(gradients)
-    })
-    all_cors[, w+1] = all_res
-  }
-  rownames(all_cors) <- pairs_names
-  return(all_cors)
-}
-
-
-# calculates the gradient-weighted association by correlation
-calculate_gradient_weighted_association = function(s, gradient = 1) {
-  message("calculating ", if (gradient == 1) "first" else "second", " gradient-weighted, cor-based association in ", s, " using 'max_win_size' = ", max_win_size)
-  all_spot_progs = all_spots_programs_comp[[s]]
-  neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-  all_cors = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size + 1)); all_pvals = all_cors
-  for (w in 0:max_win_size) {
-    association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-    gradients = if (gradient == 1) prog_gradients_win_combined[[s]] else derivatives[[s]] # chooses between first or second derivative
-    # neighbour_gradients = find_gradients(all_spot_progs, neighbors_table, mp_names, w, gradients)
-    
-    # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-    all_cor_res <- sapply(1:dim(pairs)[2], function(j) {
-      spot_abund = all_spot_progs[, pairs[1, j]]; neighbours_abund = association[, pairs[2, j]]; weights = gradients[, pairs[1, j]]
-      cor_res1 <- weighted_cor(neighbours_abund, spot_abund, weights)
-      
-      spot_abund = all_spot_progs[, pairs[2, j]]; neighbours_abund = association[, pairs[1, j]]; weights = gradients[, pairs[2, j]]
-      cor_res2 <- weighted_cor(neighbours_abund, spot_abund, weights)
-      
-      cor_res = (cor_res1 + cor_res2) / 2 # get average to determine the bi-directional correlation
-      return(cor_res)
-    })
-    all_cors[, w+1] = unlist(all_cor_res[1,]); all_pvals[, w+1] = unlist(all_cor_res[2,])
-  }
-  rownames(all_cors) <- pairs_names; rownames(all_pvals) = pairs_names
-  return(list(all_cors, all_pvals))
-}
-
-
-# modified, >> weighted << Pearson's correlation
-weighted_cor <- function(a, b, c) {
-  valid_indices <- complete.cases(a, b, c)
-  a <- a[valid_indices]; b <- b[valid_indices]; c <- c[valid_indices]
-  sum_c <- sum(c)
-  mean_a <- sum(c * a) / sum_c; mean_b <- sum(c * b) / sum_c # Gewichtete Mittelwerte
-  var_a <- sum(c * (a - mean_a)^2) / sum_c; var_b <- sum(c * (b - mean_b)^2) / sum_c # Gewichtete Varianzen
-  cov_ab <- sum(c * (a - mean_a) * (b - mean_b)) / sum_c # Gewichtete Kovarianz
-  r <- cov_ab / sqrt(var_a * var_b) # Gewichtete Korrelation
-  
-  n_eff <- (sum(c)^2) / sum(c^2) # Effektive Stichprobengröße
-  t_value <- r * sqrt((n_eff - 2) / (1 - r^2)) # Berechnung des t-Werts
-  p_value <- 2 * pt(-abs(t_value), df = n_eff - 2) # Berechnung des p-Werts
-  
-  return(c(correlation = r, p_value = p_value))
-}
-
-
-
-# calculates the gradient-weighted association by ratio (1st implementation)
-# calculate_gradient_weighted_association_by_ratio_1 = function(s, gradient = 1) {
-#   message("calculating ", if (gradient == 1) "first" else "second", " gradient-based association in ", s, " using 'max_win_size' = ", max_win_size)
-#   all_spot_progs = all_spots_programs_comp[[s]]
-#   neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-#   all_cors = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size+1))
-#   for (w in 0:max_win_size) {
-#     association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-#     gradients = if (gradient == 1) prog_gradients_win_combined[[s]] else derivatives[[s]] # chooses between first or second derivative
-#     neighbour_gradients = find_gradients(all_spot_progs, neighbors_table, mp_names, w, gradients)
-#     # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-#     all_res <- sapply(1:dim(pairs)[2], function(j) {
-#       spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_b = association[, pairs[1, j]]
-#       spot_gradient_a = gradients[, pairs[2, j]]; neighbours_gradient_b = neighbour_gradients[, pairs[1, j]]
-#       weighted_association = mean(sapply(1:length(spot_prog_a), function(i) {
-#         ratio = spot_prog_a[i] / neighbours_prog_b[i]
-#         association = (1 - abs((ratio - 1) / (ratio + 1))) * spot_gradient_a[i] * neighbours_gradient_b[i]
-#         return(association)
-#       }), na.rm = T)
-#       return(weighted_association)
-#     })
-#     all_cors[, w+1] = all_res
-#   }
-#   rownames(all_cors) <- pairs_names
-#   return(all_cors)
-# }
-
-# calculates the gradient-weighted association by ratio (2nd implementation)
-# calculate_gradient_weighted_association_by_ratio_2 = function(s, gradient = 1) {
-#   message("calculating gradient weighted association by ratio in ", s, " using 'max_win_size' = ", max_win_size)
-#   all_spot_progs = all_spots_programs_comp[[s]]
-#   neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-#   all_associations = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size))
-#   for (w in 0:max_win_size) {
-#     association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-#     gradients = if (gradient == 1) prog_gradients_win_combined[[s]] else derivatives[[s]]
-#     
-#     # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-#     associations <- sapply(1:dim(pairs)[2], function(j) {
-#       spot_prog_a = all_spot_progs[, pairs[1, j]]; neighbours_prog_a = association[, pairs[1, j]]; weights_a = gradients[, pairs[1, j]]
-#       spot_prog_b = all_spot_progs[, pairs[2, j]]; neighbours_prog_b = association[, pairs[2, j]]; weights_b = gradients[, pairs[2, j]]
-#       
-#       ratio = spot_prog_a / neighbours_prog_b
-#       obs_associations = 1 - abs((ratio - 1) / (ratio + 1))
-#       association = weighted_unadjusted_mean(obs_associations, weights_a)
-#       
-#       ratio_rev = spot_prog_b / neighbours_prog_a
-#       obs_associations_rev = 1 - abs((ratio_rev - 1) / (ratio_rev + 1))
-#       association_rev = weighted_unadjusted_mean(obs_associations_rev, weights_b)
-# 
-#       return((association + association_rev) / 2) # average of forward and reverse association
-#     })
-#     all_associations[, w+1] = associations
-#   }
-#   rownames(all_associations) <- pairs_names
-#   return(all_associations)
-# }
-
-
-# j = 29
-
-# prog_a = "Cell Cycle"; prog_b = "Undifferentiated"
-# 
-# prog_a = "Ependymal"; prog_b = "Undifferentiated"
-# a = all_spot_progs[, prog_a]; neighbours_prog_a = association[, prog_a]
-# spot_prog_b = all_spot_progs[, prog_b]; b = association[, prog_b]
-# 
-# ratio_a = a / neighbours_prog_a; w_a = abs((ratio_a - 1) / (ratio_a + 1))
-# ratio_b = spot_prog_b / b; w_b = abs((ratio_b - 1) / (ratio_b + 1))
-# 
-# weighted_associations = sapply(1:length(a), function(i) {
-#   ratio = a[i] / b[i]
-#   association = (1 - abs((ratio - 1) / (ratio + 1))) * (w_a[i] * w_b[i])
-#   return(association)
-# })
-# max(weighted_associations, na.rm = T)
-
-# spot = rownames(all_spot_progs)[13]
-# SpatialPlot(sstobj, cells.highlight = "GATCCCTTTATACTGC-1", pt.size.factor = 3, image.alpha = 0)
-# 
-# SpatialPlot(sstobj, cells.highlight = win_spots, pt.size.factor = 3, image.alpha = 0)
 
 get_perimeter_abund = function(all_spot_progs, neighbors_table, mp_names, w) {
   # determines the average abundance of each program in the perimeter 'band' of radius w, for each spot
@@ -833,247 +589,8 @@ get_perimeter_abund = function(all_spot_progs, neighbors_table, mp_names, w) {
   return(abund)
 }
 
-find_gradients = function(all_spot_progs, neighbors_table, mp_names, w, all_gradients) {
-  # determines the average gradient of each program in the perimeter 'band' of radius w, for each spot
-  # if (w == 0) return(all_spot_progs[, 1:length(mp_names)]) # edge case co-localisation
-  association <- t(sapply(rownames(all_spot_progs), function(spot) {
-    all_win_spots = spot
-    sapply(1:w, function(i) {
-      if (i == w) win_spots <<- setdiff(unique(na.omit(as.character(neighbors_table[all_win_spots,]))), all_win_spots)
-      all_win_spots <<- unique(c(all_win_spots, unique(na.omit(as.character(neighbors_table[all_win_spots,])))))
-    })
-    win_abund = colMeans(all_gradients[win_spots, 1:length(mp_names)], na.rm = T)
-    return(win_abund)
-  }))
-  return(association)
-}
-
-calculate_derivate = function(s, mp_names) {
-  message("calculating derivative of gradients in ", s)
-  spots_filt = all_spots_positions[[s]][all_spots_positions[[s]]$V1 %in% rownames(all_spots_programs_comp[[s]]), ]
-  prog_derivatives = prog_gradients_win_combined[[s]]
-  for (program in mp_names) {
-    x_offset = min(spots_filt$V3) - 1; y_offset = min(spots_filt$V4) -1
-    mtx = matrix(nrow = max(spots_filt$V3) - x_offset, ncol = max(spots_filt$V4) - y_offset)
-    for (spot in rownames(spots_filt)) {
-      x = spots_filt[spot, "V3"] - x_offset; y = spots_filt[spot, "V4"] - y_offset
-      mtx[x, y] = prog_gradients_win_combined[[s]][spot, program]
-    }
-    mtx_filled = fill_adjacent_na(mtx)
-    dx <- diff(mtx_filled, differences = 1, lag = 1); dy <- t(diff(t(mtx_filled), differences = 1, lag = 1))
-    dx <- rbind(dx, rep(0, ncol(dx))); dy <- cbind(dy, rep(0, nrow(dy))) # append columns of zeros to match dimensions
-    gradient_magnitude <- sqrt(dx^2 + dy^2)
-
-    existing_spot_gradients = spots_filt[, c(1,3,4)]
-    for (spot in rownames(existing_spot_gradients)) {
-      x = existing_spot_gradients[spot, 2] - x_offset; y = existing_spot_gradients[spot, 3] - y_offset
-      existing_spot_gradients[spot, 1] = gradient_magnitude[x, y]
-    }
-    # correct for edge cases scoring abnormally high
-    derivative = as.double(existing_spot_gradients[order(rownames(existing_spot_gradients)), ]$V1)
-    p95 <- quantile(derivative, 0.95)
-    derivative[derivative > p95] <- p95 # replace values greater than the 95th percentile with the 95th percentile
-    prog_derivatives[, program] = derivative
-  }
-  return(prog_derivatives)
-}
-
-fill_adjacent_na <- function(mtx) {
-  mtx_interpolated <- mtx
-  for (i in 1:nrow(mtx)) {
-    for (j in 1:ncol(mtx)) {
-      if (is.na(mtx[i, j])) next
-      neighbors <- list(if (i > 1) c(i - 1, j) else NA, if (i < nrow(mtx)) c(i + 1, j) else NA,
-                        if (j > 1) c(i, j - 1) else NA, if (j < ncol(mtx)) c(i, j + 1) else NA)
-      for (n in neighbors[!is.na(neighbors)]) {
-        if (is.na(mtx[n[1], n[2]])) {
-          na_neighbors = c(if (n[1] > 1) mtx[n[1] - 1, n[2]] else NA, if (n[1] < nrow(mtx)) mtx[n[1] + 1, n[2]] else NA,
-                           if (n[2] > 1) mtx[n[1], n[2] - 1] else NA, if (n[2] < ncol(mtx)) mtx[n[1], n[2] + 1] else NA)
-          mtx_interpolated[n[1], n[2]] <- mean(na_neighbors, na.rm = TRUE)
-        }
-      }
-    }
-  }
-  return(mtx_interpolated)
-}
-
-# calculate_exclusive_gradient_association = function(s, gradient = 1) {
-#   message("calculating exclusive ", if (gradient == 1) "first" else "second", " gradient-based association in ", s, " using 'max_win_size' = ", max_win_size)
-#   all_spot_progs = all_spots_programs_comp[[s]]
-#   neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-#   all_cors = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size))
-#   for (w in 1:max_win_size) {
-#     association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-#     gradients = if (gradient == 1) prog_gradients_win_combined[[s]] else derivatives[[s]] # chooses between first or second derivative
-#     neighbour_gradients = find_gradients(all_spot_progs, neighbors_table, mp_names, w, gradients)
-#     # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-#     all_cor_res <- sapply(1:dim(pairs)[2], function(j) {
-#       spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_a = association[, pairs[2, j]]
-#       spot_prog_b = all_spot_progs[, pairs[1, j]]; neighbours_prog_b = association[, pairs[1, j]]
-#       
-#       # penalise non-exclusive associations by multiplying the observed correlations with exclusivity weights for program a and b
-#       ratio_a = spot_prog_a / neighbours_prog_a; exclusivity_a = abs((ratio_a - 1) / (ratio_a + 1)) # if (w > 0) abs((ratio_a - 1) / (ratio_a + 1)) else 1
-#       ratio_b = spot_prog_b / neighbours_prog_b; exclusivity_b = abs((ratio_b - 1) / (ratio_b + 1)) # if (w > 0) abs((ratio_b - 1) / (ratio_b + 1)) else 1
-#       spot_gradient_a = gradients[, pairs[2, j]]
-#       neighbours_gradient_b = neighbour_gradients[, pairs[1, j]]
-#       
-#       weighted_association = mean(sapply(1:length(spot_prog_a), function(i) {
-#         ratio = spot_prog_a[i] / neighbours_prog_b[i]
-#         association = (1 - abs((ratio - 1) / (ratio + 1))) * exclusivity_a[i] * exclusivity_b[i]  * 1000 * spot_gradient_a[i] * neighbours_gradient_b[i]
-#         return(association)
-#       }), na.rm = T)
-#       return(weighted_association)
-#     })
-#     all_cors[, w] = all_cor_res
-#   }
-#   rownames(all_cors) <- pairs_names
-#   return(all_cors)
-# }
-# 
-# calculate_exclusivity = function(s) {
-#   message("calculating exclusivity in ", s, " using 'max_win_size' = ", max_win_size)
-#   all_spot_progs = all_spots_programs_comp[[s]]
-#   neighbors_table <- neighbors_table_funcV2(all_spots_positions[[s]], all_spot_progs)
-#   all_exclus = as.data.frame(matrix(nrow = length(pairs_names), ncol = max_win_size+1))
-#   for (w in 0:max_win_size) {
-#     association = get_perimeter_abund(all_spot_progs, neighbors_table, mp_names, w)
-#     # calculate for every pair the correlation between all program A scores in centre spots and program B abundance in the window
-#     all_exclusivities <- sapply(1:dim(pairs)[2], function(j) {
-#       spot_prog_a = all_spot_progs[, pairs[2, j]]; neighbours_prog_a = association[, pairs[2, j]]
-#       spot_prog_b = all_spot_progs[, pairs[1, j]]; neighbours_prog_b = association[, pairs[1, j]]
-#       
-#       # calculate exclusivity of program a as the ratio of a in centre vs. in neighbour spots (same for b)
-#       ratio_a = spot_prog_a / neighbours_prog_a; exclusivity_a = abs((ratio_a - 1) / (ratio_a + 1)) # if (w > 0) abs((ratio_a - 1) / (ratio_a + 1)) else 1
-#       ratio_b = spot_prog_b / neighbours_prog_b; exclusivity_b = abs((ratio_b - 1) / (ratio_b + 1)) # if (w > 0) abs((ratio_b - 1) / (ratio_b + 1)) else 1
-#       exclusivity = mean(exclusivity_a * exclusivity_b, na.rm = T)
-#       return(exclusivity)
-#     })
-#     all_exclus[, w+1] = all_exclusivities
-#   }
-#   rownames(all_exclus) <- pairs_names
-#   return(all_exclus)
-# }
-# 
-# calculate_derivate2 = function(s, mp_names) {
-#   message("calculating derivative of gradients in ", s)
-#   spots_filt = all_spots_positions[[s]][all_spots_positions[[s]]$V1 %in% rownames(all_spots_programs_comp[[s]]), ]
-#   prog_derivatives = prog_gradients_win_combined[[s]]
-#   for (program in mp_names) {
-#     x_offset = min(spots_filt$V3) - 1; y_offset = min(spots_filt$V4) -1
-#     mtx = matrix(nrow = max(spots_filt$V3) - x_offset, ncol = max(spots_filt$V4) - y_offset)
-#     for (spot in rownames(spots_filt)) {
-#       x = spots_filt[spot, "V3"] - x_offset; y = spots_filt[spot, "V4"] - y_offset
-#       mtx[x, y] = prog_gradients_win_combined[[s]][spot, program]
-#     }
-#     mtx_filled = zoo::na.approx(mtx, rule = 1)
-#     dx <- diff(mtx_filled, differences = 1, lag = 1); dy <- t(diff(t(mtx_filled), differences = 1, lag = 1))
-#     dx <- rbind(dx, rep(0, ncol(dx))); dy <- cbind(dy, rep(0, nrow(dy))) # append columns of zeros to match dimensions
-#     gradient_magnitude <- sqrt(dx^2 + dy^2)
-#     gradient_magnitude[!is.na(mtx) & is.na(gradient_magnitude)] = "NaN"
-#     gradients_filled = interpolate_matrix(gradient_magnitude)
-#     
-#     existing_spot_gradients = spots_filt[, c(1,3,4)]
-#     for (spot in rownames(existing_spot_gradients)) {
-#       x = existing_spot_gradients[spot, 2] - x_offset; y = existing_spot_gradients[spot, 3] - y_offset
-#       existing_spot_gradients[spot, 1] = gradients_filled[x, y]
-#     }
-#     prog_derivatives[, program] = as.double(existing_spot_gradients[order(rownames(existing_spot_gradients)), ]$V1)
-#   }
-#   return(prog_derivatives)
-# }
-# 
-# interpolate_matrix = function(mtx) {
-#   mtx_interpolated <- mtx
-#   for (i in 1:nrow(mtx)) {
-#     for (j in 1:ncol(mtx)) {
-#       if (!is.na(mtx[i, j]) && mtx[i, j] == "NaN") {
-#         neighbors = c(if (i > 1) mtx[i - 1, j] else NA, if (i < nrow(mtx)) mtx[i + 1, j] else NA,
-#                       if (j > 1) mtx[i, j - 1] else NA, if (j < ncol(mtx)) mtx[i, j + 1] else NA)
-#         mtx_interpolated[i, j] = if (length(neighbors[!is.na(neighbors)]) > 0) mean(as.double(neighbors), na.rm = TRUE) else 0
-#       }
-#     }
-#   }
-#   return(mtx_interpolated)
-# }
-
-
-# finds all adjacent/neighbouring spots for each spot
-neighbors_table_funcV2 = function(spots_positions, spots_programs) {
-  neighbors_table = sapply(spots_programs$barcodes, function(spot) {
-    spots_row = spots_positions[spots_positions$V1 == spot, 3]
-    spots_col = spots_positions[spots_positions$V1 == spot, 4]
-    if (spots_col == 0 | spots_row == 0) {
-      c1 = NA
-    } else {
-      n1 = spots_positions$V1[spots_positions$V3 == spots_row - 1 & spots_positions$V4 == spots_col - 1]
-      if (length(n1) == 0 || (spots_positions$V2[spots_positions$V1 == n1] == 0 | !(n1 %in% spots_programs$barcodes))) {
-        c1 = NA
-      } else {
-        c1 = as.character(n1)
-      }
-    }
-    if (spots_col == 127 | spots_row == 0) {
-      c2 = NA
-    } else {
-      n2 = spots_positions$V1[spots_positions$V3 == spots_row - 1 & spots_positions$V4 == spots_col + 1]
-      if (length(n2) == 0 || (spots_positions$V2[spots_positions$V1 == n2] == 0 | !(n2 %in% spots_programs$barcodes))) {
-        c2 = NA
-      } else {
-        c2 = as.character(n2)
-      }
-    }
-    if (spots_col == 0 | spots_col == 1) {
-      c3 = NA
-    } else {
-      n3 = spots_positions$V1[spots_positions$V3 == spots_row & spots_positions$V4 == spots_col - 2]
-      if (length(n3) == 0 || (spots_positions$V2[spots_positions$V1 == n3] == 0 | !(n3 %in% spots_programs$barcodes))) {
-        c3 = NA
-      } else {
-        c3 = as.character(n3)
-      }
-    }
-    if (spots_col == 126 | spots_col == 127) {
-      c4 = NA
-    } else {
-      n4 = spots_positions$V1[spots_positions$V3 == spots_row & spots_positions$V4 == spots_col + 2]
-      if (length(n4) == 0 || (spots_positions$V2[spots_positions$V1 == n4] == 0 | !(n4 %in% spots_programs$barcodes))) {
-        c4 = NA
-      } else {
-        c4 = as.character(n4)
-      }
-    }
-    if (spots_col == 0 | spots_row == 77) {
-      c5 = NA
-    } else {
-      n5 = spots_positions$V1[spots_positions$V3 == spots_row + 1 & spots_positions$V4 == spots_col - 1]
-      if (length(n5) == 0 || (spots_positions$V2[spots_positions$V1 == n5] == 0 | !(n5 %in% spots_programs$barcodes))) {
-        c5 = NA
-      } else {
-        c5 = as.character(n5)
-      }
-    }
-    if (spots_col == 127 | spots_row == 77) {
-      c6 = NA
-    } else {
-      n6 = spots_positions$V1[spots_positions$V3 == spots_row + 1 & spots_positions$V4 == spots_col + 1]
-      if (length(n6) == 0 || (spots_positions$V2[spots_positions$V1 == n6] == 0 | !(n6 %in% spots_programs$barcodes))) {
-        c6 = NA
-      } else {
-        c6 = as.character(n6)
-      }
-    }
-    return(c(c1,c2,c3,c4,c5,c6))
-  })
-  neighbors_table = t(neighbors_table)
-  row.names(neighbors_table) = spots_programs$barcodes
-  return(neighbors_table)
-}
-
-
-
-
-
-# ----------------- plotting helper functions ----------------
+                                    
+# ---------- plotting helper functions -----------
 
 plot_association_heatmap = function(mtx, order_mode = "association_type", title = NA, silent = F, asso_type_tresholds = c(0, 0), 
                                     anno = NULL, anno_cols = NULL, gaps_row = NULL, gaps_col = NULL, fixed_scale = F) {
@@ -1106,58 +623,7 @@ plot_association_heatmap = function(mtx, order_mode = "association_type", title 
                      gaps_row = gaps_row, gaps_col = gaps_col, annotation_colors = anno_cols, annotation_names_row = F, annotation_legend = T))
 }
 
-plot_mp_association_mtx = function(dist, split.by = NULL, custom_order = NULL, nrow = 1) {
-  if (is.null(split.by)) split.by = rep("all", length(sample_ids)); names(split.by) = sample_ids
-  
-  plots = lapply(unique(split.by), function(group) {
-    dist_plots = lapply(unique(dist), function(dist) {
-      samples = names(split.by)[split.by == group]
-      avg_group_association <- Reduce(function(x, y) Map(`+`, x, y), association[samples])
-      avg_group_association <- as.data.frame(lapply(avg_group_association, function(x) x / length(samples)))
-      rownames(avg_group_association) = pairs_names; colnames(avg_group_association) = 0:15
-      data_unscaled <- reshape2::melt(avg_group_association); data_unscaled$pair_name = rep(rownames(avg_group_association), ncol(avg_group_association))
-      names(data_unscaled)[1] = "radius"
-      df = data_unscaled[data_unscaled$radius == dist, ]
-      df$mp1 = sub(" x .*", "", df$pair_name); df$mp2 = sub("^.*? x ", "", df$pair_name); df = df[, c(2,4,5)] # split the pairs into two columns
-      df_rev = df; df_rev$mp1 = df$mp2; df_rev$mp2 = df$mp1; df_diag = data.frame(value = rep(1, length(mp_names)), mp1 = mp_names, mp2 = mp_names)
-      df = rbind(df, df_rev, df_diag)
-      if (!is.null(custom_order)) {
-        levels = if (!is.list(custom_order)) custom_order else if (group %in% names(custom_order)) custom_order[[group]] else unique(df$mp1)
-        df$mp1 = factor(df$mp1, levels = levels); df$mp2 = factor(df$mp2, levels = levels) 
-      }
-      ggplot(df, aes(x = mp1, y = mp2, fill = value, size = abs(value))) + geom_point(shape = 21, color = "white", stroke = NA) + geom_tile(color = "grey70", fill = NA, size = 0.25) +
-        scale_fill_gradientn(colors = rev(brewer.pal(11, "RdBu")), limits = c(-1, 1)) + scale_size(range = c(0, 7.5)) +  
-        coord_fixed() + labs(title = paste0(group, " (dist = ", dist, ")"), fill = "Correlation") + guides(size = "none") + theme_minimal() + 
-        theme(axis.text.x = element_text(angle = 45, hjust = 1), axis.title = element_blank(), panel.grid = element_blank())
-    })
-    dist_plots
-  })
-  plots = purrr::flatten(plots)
-  if (length(plots) > 1) {
-    plots[1:(length(plots)-1)] = lapply(plots[1:(length(plots)-1)], function(p) p + theme(legend.position = "none"))
-    wrap_plots(plots, nrow = nrow)
-  } else plots[[1]]
-}
-
-scale_min_max_5_95 <- function(x) {
-  x_min <- quantile(x, 0.05, na.rm = TRUE); x_max <- quantile(x, 0.95, na.rm = TRUE) # Calculate the 5th and 95th percentiles
-  x_scaled <- -1 + 2 * ((x - x_min) / (x_max - x_min))
-  x_scaled[x < x_min] <- -1; x_scaled[x > x_max] <- 1 # set over/under passing values to 1/-1
-  return(x_scaled)
-}
-scale_min_max <- function(x) {
-  x_min <- min(x, na.rm = TRUE)
-  x_max <- max(x, na.rm = TRUE)
-  -1 + ((x - x_min) * 2 / (x_max - x_min))
-}
-
-reorder_substrings <- function(s, split_symbol = " x ") {
-  parts <- strsplit(s, split_symbol, fixed = TRUE)[[1]] # Split the string by split_symbol 
-  if (parts[1] > parts[2]) { s <- paste(parts[2], parts[1], sep = split_symbol) # Reorder alphabetically
-  } else { s <- paste(parts[1], parts[2], sep = split_symbol) }
-  return(s)
-}
-
+                       
 target_plot = function(data, radii = "all", add_legend = T) {
   library(plotrix)
   colors <- colorRampPalette(brewer.pal(11, "RdBu"))(100)
@@ -1296,13 +762,13 @@ plot_all_sig_zone_abundances = function(szone_abund, fzone_abund, out_dir, add_v
 
 
 get_sig_scores = function(sigs, plot_sigs = F, out_dir = NULL, nrow = 2) {
-  source(file.path(utils_dir, "Single cell/seurat_utils.R"))
+  source("utils/seurat_utils.R")
   if (!is.null(out_dir) && !dir.exists(out_dir)) dir.create(out_dir, r = T)
   overview_subtitles = c(names(sigs), "[Counts]", "[Features]", "[H&E]")
   all_spots_programs_comp = list(); all_spots_programs_comp_norm = list(); all_spots_programs_comp_spot_norm = list()
   for (s in sample_ids) {
     message(">>> loading sample '", s, "' [", format(Sys.time(), "%d.%m. %X"), "] <<<")
-    sstobj = readRDS(paste0("Objects/sstobj_", s, ".rds"))
+    sstobj = readRDS(paste0("sstobj_", s, ".rds"))
     ratio = get_spatial_aspect_ratio(sstobj); pt_size = get_spatial_point_size(sstobj, scale_factor = 3.5)
     message("transfering sigs to ", s)
     sstobj = try_add_module_score(sstobj, features = sigs, name = "sig", ctrl = 100, min_ctrl = 50, nbin = 24, min_bin = 18, verbose = T)
@@ -1340,7 +806,7 @@ get_sig_scores = function(sigs, plot_sigs = F, out_dir = NULL, nrow = 2) {
 }
 
 get_sig_szone_abund = function(all_spots_programs_comp, complexity_zones, min_score_threshold) {
-  # use raw scores and a hard threshold to consider only spots with significant expression of a signature (emphasises differences much better)
+  # use raw scores and a hard threshold to consider only spots with significant expression of a signature
   sig_szone_abund = lapply(sample_ids, function(s) { # simpler variant without significance testing
     sig_scores = all_spots_programs_comp[[s]]
     zone_abund = sapply(colnames(sig_scores), function(sig) {
@@ -1374,56 +840,5 @@ get_sig_fzone_abund_by_threshold = function(all_spots_programs_comp, functional_
   return(list(sig_fzone_abund, as.data.frame(all_n_spots), all_vars))
 }
 
-get_sig_fzone_abund_by_weighting = function(all_scores, functional_zones) {
-  sig_fzone_abund = lapply(sample_ids, function(s) {
-    sapply(colnames(all_scores[[s]]), function(sig) {
-      zones = functional_zones[[s]]
-      sig_expr = all_scores[[s]][, sig]
-      colSums(zones * sig_expr, na.rm = T) / sum(abs(sig_expr))
-    })
-  }); names(sig_fzone_abund) = sample_ids
-  return(sig_fzone_abund)
-}
-
-
-reshape_df_pairs_to_mtx = function(df, mp_names) {
-  value_matrix <- matrix(NA, nrow = length(mp_names), ncol = length(mp_names), dimnames = list(mp_names, mp_names))
-  pvalue_matrix <- matrix(NA, nrow = length(mp_names), ncol = length(mp_names), dimnames = list(mp_names, mp_names))
-  for (row in seq_len(nrow(df))) {
-    pair <- as.character(df$pair_name[row])
-    value <- df$value[row]; pvalue <- df$pvalue[row]
-    parts <- unlist(strsplit(pair, " x ")) # Split the pair into its components
-    label1 <- parts[1]; label2 <- parts[2]
-    idx1 <- match(label1, mp_names); idx2 <- match(label2, mp_names) # Find the indices for the mp_names
-    value_matrix[idx1, idx2] <- value; value_matrix[idx2, idx1] <- value
-    pvalue_matrix[idx1, idx2] <- pvalue; pvalue_matrix[idx2, idx1] <- pvalue
-  }
-  value_matrix[is.na(value_matrix)] = 1; pvalue_matrix[is.na(pvalue_matrix)] = 1
-  return(list(value_matrix, pvalue_matrix))
-}
-
-
-combine_pvals_dfs = function(pval_dfs) {
-  nrow_df = nrow(pval_dfs[[1]]); ncol_df = ncol(pval_dfs[[1]])
-  combined_pvals <- matrix(NA, nrow = nrow_df, ncol = ncol_df) # Output matrix
-  for (i in 1:nrow_df) {
-    for (j in 1:ncol_df) {
-      pvals_to_combine <- sapply(pval_dfs, function(df) df[i, j])
-      combined_pvals[i, j] = average_indp_pvals_by_fisher(pvals_to_combine) # Extract the p-values at position (i, j) from all dataframes
-    }
-  }
-  combined_pvals_df <- as.data.frame(combined_pvals); colnames(combined_pvals_df) <- colnames(pval_dfs[[1]]); rownames(combined_pvals_df) <- rownames(pval_dfs[[1]])
-  # if (adjust) combined_pvals_df = pmin(combined_pvals_df * (nrow_df * ncol_df), 1) # adjust for multiple testing using bonferroni correction (number of tests = n_pairs * n_distances)
-  return(combined_pvals_df)
-}
-
-
-
-
-
-
-
-
-                                    
 
 
