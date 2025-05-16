@@ -1,7 +1,5 @@
 library(RCy3)
 
-source("utils/r_utils.R")
-source("utils/spatial_utils.R")
 source("utils/spatial_score_utils.R")
 
 
