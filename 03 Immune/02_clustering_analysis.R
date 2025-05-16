@@ -51,7 +51,7 @@ ggsave(filename = paste0("02_umap_rpca_TME-annotated.png"), plot = p, width = 9,
 
 
 # ------------------------ PART 2: transfer NMF metaprograms to object -------------------------
-# requires identification of NMF programs (-> '02_NMF_programs.R')
+# requires identification of NMF programs (-> '03_NMF_programs.R')
 mps = openxlsx::read.xlsx(paste0("immune_NMF_metaprograms_main.xlsx"), sheet = "MP genes (final)")
 seurat_out_dir = ""
 
