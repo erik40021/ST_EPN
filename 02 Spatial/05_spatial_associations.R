@@ -39,7 +39,7 @@ saveRDS(association, file.path(base_dir, "association.rds"))
 
 
 # ------------------------------ PART 2: Plot association scores ------------------------------
-out_dir = file.path(base_dir, "02 Plots per sample"); if (!dir.exists(out_dir)) dir.create(out_dir, r = T)
+out_dir = ""
 
 # 2.1 plot all associations as heatmaps
 # a) individually by sample
@@ -158,7 +158,7 @@ fzone_order = c("hyp", "hyp-adj", "angio-adj", "Tdiff", "Tundiff")
 complexity_zones = readRDS("complexity_zones.rds")
 functional_zones = readRDS(file.path(base_dir, "functional_zones_norm.rds"))
 
-# 4.0 as a base reference, plot the average spot composition regarding s and fzones
+# 4.1 as a base reference, plot the average spot composition regarding s and fzones
 # a. average for structural zones
 all_szone_comps = readRDS("complexity_rel_sample_zone_abund.rds")
 comps_by_subtype = sapply(unique(subtype), function(subt) rowMeans(all_szone_comps[, subtype == subt, drop = FALSE])); colnames(comps_by_subtype) = unique(subtype)
@@ -187,24 +187,11 @@ p = ggplot(data, aes(x = group, y = value, fill = zone)) + geom_bar(stat = "iden
 ggsave("avg_composition_of_fzones_across_groups.png", plot = p, width = 7, height = 6, path = out_dir)
 
 
-# 4.1 investigate all curated ST-EPN signatures
-out_dir = file.path(base_dir, "04 Functional zones/03 Zones vs. sigs/ST-EPN"); if (!dir.exists(out_dir)) dir.create(out_dir)
-sn_stepn_sigs = as.list(openxlsx::read.xlsx("K:/PHO/AG Kerl/Erik/ST-EPN/Data Analysis/Ressources/curated_ST-EPN_signatures.xlsx"))
-min_score_threshold = 0.3 # threshold to decide if a signatures is 'significantly expressed' in a spot
-# stepn_scores = get_sig_scores(sn_stepn_sigs, plot_sigs = T, nrow = 3, out_dir = file.path(out_dir, "Single-cell ST-EPN module scores"))[[1]] # only need raw scores here
-# stepn_scores = lapply(stepn_scores, function(s) s[, colnames(s) != "Respiration"]) # exclude Respiration here due to very high, ubiquituous base expression
-# saveRDS(stepn_scores, file.path(out_dir, "stepn_sig_scores.rds"))
-stepn_scores = readRDS(file.path(out_dir, "stepn_sig_scores.rds"))
-szone_abund = get_sig_szone_abund(stepn_scores, complexity_zones, min_score_threshold)
-fzone_abund = get_sig_fzone_abund_by_threshold(stepn_scores, functional_zones, min_score_threshold)
-plot_all_sig_zone_abundances(szone_abund, fzone_abund, out_dir)
-
-
 # 4.2 investigate specific reference myeloid programs (from Miller et al. 2025)
 out_dir = ""
 myeloid_sigs = as.list(openxlsx::read.xlsx("Miller 2025 cNMF genes.xlsx", sheet = "Myeloid Top 100 genes per prog."))
 min_score_threshold = 0.3 # threshold to decide if a signatures is 'significantly expressed' in a spot
-myeloid_scores = get_sig_scores(myeloid_sigs, plot_sigs = T, out_dir = file.path(out_dir, "Myeloid sig module scores"))[[1]] # only need raw scores here
+myeloid_scores = get_sig_scores(myeloid_sigs, plot_sigs = T, out_dir = out_dir)[[1]] # only need raw scores here
 saveRDS(myeloid_scores, file.path(out_dir, "myeloid_sig_scores.rds"))
 myeloid_scores = readRDS(file.path(out_dir, "myeloid_sig_scores.rds"))
 szone_abund = get_sig_szone_abund(myeloid_scores, complexity_zones, min_score_threshold)
@@ -216,7 +203,7 @@ plot_all_sig_zone_abundances(szone_abund, fzone_abund, out_dir)
 out_dir = ""
 immune_sigs = as.list(openxlsx::read.xlsx("immune_NMF_metaprograms_main.xlsx", sheet = "MP genes (final)"))
 min_score_threshold = 0.3 # threshold to decide if a signatures is 'significantly expressed' in a spot
-immune_scores = get_sig_scores(immune_sigs, plot_sigs = T, out_dir = file.path(out_dir, "Immune sig module scores"))[[1]] # only need raw scores here
+immune_scores = get_sig_scores(immune_sigs, plot_sigs = T, out_dir = out_dir)[[1]] # only need raw scores here
 saveRDS(immune_scores, file.path(out_dir, "immune_sig_scores.rds"))
 immune_scores = readRDS(file.path(out_dir, "immune_sig_scores.rds"))
 szone_abund = get_sig_szone_abund(immune_scores, complexity_zones, min_score_threshold)
