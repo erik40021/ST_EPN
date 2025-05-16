@@ -51,7 +51,7 @@ ggsave(filename = paste0("02_umap_rpca_TME-annotated.png"), plot = p, width = 9,
 
 
 # ------------------------ PART 2: transfer NMF metaprograms to object -------------------------
-# requires identification of NMF programs (-> '03_NMF_programs.R')
+# requires finished identification of immune NMF programs (same as in '02 Spatial/02_NMF_programs.R')
 mps = openxlsx::read.xlsx(paste0("immune_NMF_metaprograms_main.xlsx"), sheet = "MP genes (final)")
 seurat_out_dir = ""
 
@@ -59,7 +59,7 @@ seurat_out_dir = ""
 immu_sobj = Seurat::AddModuleScore(immu_sobj, features = as.list(mps), name = "MP") # add expression scores of each MP to each cell
 immu_sobj = assign_cells_by_max_score(immu_sobj, score_names = paste0("MP", 1:length(as.list(mps))), meta_data_entry_name = "metaprogram")
 levels(immu_sobj$metaprogram) = names(as.list(mps)) # rename 'metaprogram' metadata entry
-saveRDS(immu_sobj, "Objects/ST_EPN_immune.rds")
+saveRDS(immu_sobj, "ST_EPN_immune.rds")
 
 p = DimPlot(immu_sobj, reduction = "umap.bat.rpca", label = T, raster = F) + NoLegend() + DimPlot(immu_sobj, reduction = "umap.bat.rpca", group.by = "metaprogram", cols = my_cols, raster = F)
 ggsave(filename = "01a_umap_metaprograms.png", plot = p, width = 15, height = 7, path = seurat_out_dir)
