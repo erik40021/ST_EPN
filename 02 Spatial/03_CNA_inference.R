@@ -14,7 +14,7 @@ source("utils/seurat_utils.R")
 
 # ------ PART 1: infer CNAs ------
 
-gene_positions <- read.table("gene_ordering.txt", header = T)
+gene_positions <- read.table("gene_ordering.txt", header = T) # load human GRCh38 reference genome
 cna_cols = c("#F2B701","#3969AC","#EF4868","#11A579","#6d2c6e","#ffe39e","#bd6908","#66C5CC","#ff918a","cyan2","#ffea03","#80BA5A","#D4D915","#d5bdaf",
              "#CF1C90","#4b4b8f","#B95FBB","#748cab","yellow","grey","#ebc5ae","brown","#bab475","#4e81a3","#967bad", "#542f3d","#f5bfd3","#adf590","#e3d536","#cb1adb")
 names(cna_cols) = 1:length(cna_cols)
@@ -32,8 +32,8 @@ options(scipen = 100)
 options(bitmapType='cairo')
 ht_opt$message = FALSE
 
-input_dir = "input_data/sst_objects_stepn"
-out_dir = "output_data/spatial_inferCNV"
+input_dir = ""
+out_dir = ""
 sample_ids = gsub("^sstobj_|\\.rds$", "", list.files(input_dir))
 
 # recommended to be run in parallel on server
@@ -50,7 +50,7 @@ res = mclapply(sample_ids, mc.cores = n_samples, function(s) {
 run_infercnv_spatial = function(s, input_dir, out_dir, inner_cores, gene_positions, prepare_plot_data = T, do_plots = F, cols = NULL, louvain_res = 1) {
   message("starting inferCNV run for ", s, " (", format(Sys.time(), "%d.%m. %X"), ")")
   out_dir <- file.path(out_dir, s); if (!dir.exists(out_dir)) dir.create(out_dir, recursive = T)
-  sstobj = readRDS(file = paste0(input_dir, "/sstobj_", s, ".rds")) # load Seurat object of sample
+  sstobj = readRDS(file = file.path(input_dir, "sstobj_", s, ".rds")) # load Seurat object of sample
   obs_mtx = GetAssayData(sstobj, layer = "counts")
   all_genes <- union(rownames(ref_mtx), rownames(obs_mtx))
   combined_mtx <- matrix(0, nrow = length(all_genes), ncol = ncol(ref_mtx) + ncol(obs_mtx))
@@ -149,10 +149,10 @@ norm_mscore_cors_per_mp = list()
 avg_profile_cors_per_mp = list()
 for (s in sample_ids) {
   message(">>> loading sample '", s, "' at [", format(Sys.time(), "%d.%m. %X"), "] <<<")
-  sstobj = readRDS(paste0("Objects/sstobj_", s, ".rds"))
-  infercnv_obj = readRDS(file.path("CNA inference", s, "run.final.infercnv_obj"))
-  norm_malignancy_score = readRDS(file.path("CNA inference", s, "malignancy_score_norm.rds"))
-  raw_malignancy_score = readRDS(file.path("CNA inference", s, "malignancy_score.rds"))
+  sstobj = readRDS(paste0("sstobj_", s, ".rds"))
+  infercnv_obj = readRDS(file.path(s, "run.final.infercnv_obj"))
+  norm_malignancy_score = readRDS(file.path(s, "malignancy_score_norm.rds"))
+  raw_malignancy_score = readRDS(file.path(s, "malignancy_score.rds"))
   cna_mtx = infercnv_obj@expr.data # cna prediction matrix
   cna_mtx = cna_mtx[, colnames(cna_mtx) %in% colnames(sstobj)]
   # calculate correlation of MP scores and CNA malignancy score
@@ -161,7 +161,7 @@ for (s in sample_ids) {
 saveRDS(norm_mscore_cors_per_mp, file = "Data/norm_malignancy_vs_mp_scores_correlation_per_sample.rds")
 
 # relate normalised malignancy score to MPs
-norm_mscore_cors_per_mp = readRDS("Data/norm_malignancy_vs_mp_scores_correlation_per_sample.rds")
+norm_mscore_cors_per_mp = readRDS("norm_malignancy_vs_mp_scores_correlation_per_sample.rds")
 data <- do.call(rbind, norm_mscore_cors_per_mp); colnames(data) = colnames(metaprograms)
 data <- reshape2::melt(data); colnames(data) <- c("sample", "metaprogram", "correlation")
 mean_scores = data %>% group_by(metaprogram) %>% summarise(mean_cor = mean(correlation, na.rm = TRUE)) %>% arrange(desc(mean_cor))
