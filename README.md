@@ -3,7 +3,7 @@
 This repository contains all code developed for the study "Integrated dual-omics analysis elucidates transcriptional heterogeneity and hypoxia-driven spatial organisation in supratentorial ependymoma".
 
 ### Single-nucleus analyses  
-- ***01_processing.R:** quality control, filtering, integration and clustering of raw single-nucleus data
+- *01_processing.R:* quality control, filtering, integration and clustering of raw single-nucleus data
 - **02_clustering_analysis.R:** annotation, subtype variance calculation and subsetting of malignant nuclei
 - **03_CNA_inference.R:** inference of copy-number alterations (CNAs)
 - **04_NMF_programs.R:** calculation and clustering of NMF consensus programs
@@ -28,8 +28,11 @@ Collection of all utility functions needed to run the analyses above.
 
 # General notes
 Raw and processed data used in this study can be downloaded under EGA repository (link).
-NMF analysis was mainly based on Gavish et al. 23 (see https://doi.org/10.1038/s41586-023-06130-4 for additional reference)
-Spatial analyses were inspired by Greenwald et al. 24 (see https://doi.org/10.1016/j.cell.2024.03.029 for additional reference)
-R version used was 4.4.1
+
+NMF analysis was mainly based on Gavish et al. 23 (see https://doi.org/10.1038/s41586-023-06130-4 for additional reference).
+
+Spatial analyses were inspired by Greenwald et al. 24 (see https://doi.org/10.1016/j.cell.2024.03.029 for additional reference).
+
+R version used was 4.4.1.
 
 
