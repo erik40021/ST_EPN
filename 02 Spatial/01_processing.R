@@ -88,7 +88,7 @@ for (s in sample_ids) {
   ggtitle(paste0("After filtering\n(features >= ", min_counts_per_spot, "/", min_counts_per_spot_necrotic, " & mt_pct < ", max_mt_pct, "/", max_mt_pct_necrotic, "%)"))
   ggsave("01e_QC_post_filtering.png", plot = wrap_plots(p1, p2, p3), path = out_dir, width = 15, height = 7)
   
-  # 2. Standard processing (transformation + clustering)
+  # 2. Standard processing (transformation + clustering (only for basic understanding of samples)))
   sstobj = SCTransform(sstobj, assay = "Spatial", variable.features.n = n_var_features) # final run: normalise genes, find most variable genes, and scale those genes
   sstobj = RunPCA(sstobj, verbose = FALSE, features = VariableFeatures(sstobj))
   
