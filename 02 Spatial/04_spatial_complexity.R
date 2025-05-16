@@ -12,7 +12,6 @@ library(gridExtra)
 library(grid)
 
 source("utils/r_utils.R")
-source("utils/seurat_utils.R")
 source("utils/spatial_utils.R")
 source("utils/spatial_score_utils.R")
 
@@ -29,6 +28,7 @@ win_sizes = c(5, 8, 11)
 # ---------------------------- PART 0: extract data (only one time) -------------------------
 
 all_spots_positions = list(); all_spots_programs_comp_norm = list(); all_spots_programs_comp = list(); all_spots_programs_comp_spot_norm = list()
+all_norm_malignancy_scores = list(); all_raw_malignancy_scores = list()
 for (s in sample_ids) {
   message("extracting data from ", s)
   sstobj = readRDS(file = paste0("sstobj_", s, ".rds"))
@@ -42,11 +42,14 @@ for (s in sample_ids) {
   spots_programs_comp_norm$barcodes = rownames(spots_programs_comp_norm); colnames(spots_programs_comp_norm) = c(mp_names, "barcodes")
   all_spots_positions[[s]] = spots_positions; all_spots_programs_comp_norm[[s]] = spots_programs_comp_norm; 
   all_spots_programs_comp[[s]] = spots_programs_comp; all_spots_programs_comp_spot_norm[[s]] = spots_programs_comp_spot_norm
+  all_norm_malignancy_scores[[s]] = norm_malignancy_score; all_raw_malignancy_scores[[s]] = raw_malignancy_score
 }
 saveRDS(all_spots_positions, file = file.path(base_dir, "all_spots_positions.rds")) # <- used for all spatial scores
 saveRDS(all_spots_programs_comp_norm, file = file.path(base_dir, "all_spots_programs_comp_norm.rds")) # <- used for complexity score and downstream analyses
 saveRDS(all_spots_programs_comp, file = file.path(base_dir, "all_spots_programs_comp.rds")) # <- used for association and zone abundances (PART 3)
 saveRDS(all_spots_programs_comp_spot_norm, file = file.path(base_dir, "all_spots_programs_comp_spot_norm.rds")) # <- used to define hyp-classes
+saveRDS(all_norm_malignancy_scores, file =  file.path(base_dir, "../all_norm_malignancy_scores.rds")) # <- used to differentiate malignant from non-malignant spots ('CNA' score)
+saveRDS(all_raw_malignancy_scores, file =  file.path(base_dir, "../all_raw_malignancy_scores.rds")) # <- same but not normalised, to differentiate magnitudes of the score across samples better
 
 
 # ------------------------------- PART 1: calculate spatial coherence and complexity -----------------------
@@ -57,7 +60,7 @@ names(coherence) = sample_ids
 saveRDS(coherence, file.path(base_dir, "coherence.rds"))
           
 # 1.2 calculate spatial complexity 
-# recommended to be run on server and in parallel
+# recommended to be run in parallel on server
 # to run locally:
 win_sizes = c(5, 8, 11)
 rand_num = 100
@@ -101,7 +104,7 @@ for (s in sample_ids) {
   gr_plots = lapply(gr_plots, function(p) p + scale_fill_gradientn(colors = Seurat:::SpatialColors(n = 100), limits = c(0, global_gr_max)))
   ggsave(filename = paste0(s, "_b_spatial_complexity.png"), plot = wrap_plots(gr_plots, ncol = 5), width = 20, height = 10, path = out_dir)
 
-  # merge scores across programs by max
+  # 'merge' scores across programs by taking the maximal complexity score
   sstobj$coherence = apply(coherence[[s]], 1, function(x) max(x, na.rm = T))
   co = SpatialPlot(sstobj, pt.size.factor = pt_size, features = "coherence", image.scale = NULL) + ggtitle("max coherence") + theme(legend.position = "right", aspect.ratio = ratio)
   sstobj$complexity = apply(complexity_win_combined[[s]], 1, function(x) max(x, na.rm = T))
@@ -242,12 +245,12 @@ all_zones_smoothened = lapply(sample_ids, function(s) {
 complexity_zones = all_zones_smoothened; names(complexity_zones) = sample_ids
 saveRDS(complexity_zones, file.path(base_dir, "complexity_zones.rds"))
 
-# 2.2 plot structural zones (together with discrete malignancy) in every sample
-zone_type = "complexity"       # choose 'coherence' or 'gradients'-based zones to run this with
+# 2.2 plot structural zones based on complexity or coherence (together with discrete malignancy) in every sample
+zone_type = "complexity"       # choose 'coherence' or 'complexity'-based zones to run this with
 malignancy_type = "raw"        # choose 'norm' or 'raw' for normalised or non-normalised maligancy score
 all_zones = if (zone_type == "coherence") all_coherence_zones else complexity_zones
 all_mscores = if (malignancy_type == "norm") all_norm_malignancy_scores else all_raw_malignancy_scores
-mscore_threshold = if (malignancy_type == "norm") 0.5 else 1
+mscore_threshold = if (malignancy_type == "norm") 0.5 else 1 # threshold to decide if spot is considered malignant or not
 zone.colors = c(structured_high = "#a82203", structured_low = "#cf5e4e", disorganised_high = "#003967", disorganised_low = "#208cc0", non_malignant = "#11A579", intermediate ="#f1af3a")
 
 spot_malignancy = lapply(sample_ids, function(s) ifelse(all_mscores[[s]] >= mscore_threshold, "mal", "non_mal")); names(spot_malignancy) = sample_ids
