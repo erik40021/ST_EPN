@@ -13,7 +13,6 @@ library(grid)
 library(patchwork)
 
 source("utils/r_utils.R")
-source("utils/spatial_utils.R")
 source("utils/spatial_score_utils.R")
 
 base_dir = ""
