@@ -22,6 +22,10 @@ This repository contains all code developed for the study "Integrated dual-omics
 - *02_clustering_analysis.R:* annotation of clusters and transfer of NMF consensus programs
 - *03_cell_cell_interactions.R:* cell-cell interaction analysis between hypoxic and non-hypoxic tumour nuclei and immune nuclei
 
+### Methylation analyses
+- *01_clustering.R:* multi-iteration clustering of methylation data from 49 patients, integrated with 230 reference methylomes
+- *02_CDKN2AB.R:* automated detection of coy-number alteration at the CDKN2A/B locus
+
 ### Utility functions
 Collection of all utility functions needed to run the analyses above.
 
