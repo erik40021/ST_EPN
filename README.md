@@ -36,7 +36,7 @@ Raw and processed data used in this study can be downloaded under EGA repository
 
 NMF analysis was mainly based on Gavish et al. 23 (see https://doi.org/10.1038/s41586-023-06130-4 for additional reference).
 
-Spatial analyses were inspired by Greenwald et al. 24 (see https://doi.org/10.1016/j.cell.2024.03.029 for additional reference).
+Spatial analyses were conceptually inspired by Greenwald et al. 24 (see https://doi.org/10.1016/j.cell.2024.03.029 for additional reference).
 
 R version used was 4.4.1.
 
