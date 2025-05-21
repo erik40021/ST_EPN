@@ -5,10 +5,6 @@ library(conumee2)
 library(ggplot2)
 library(dplyr)
 
-source(file.path(utils_dir, "Single cell/seurat_utils.R"))
-source(file.path(utils_dir, "r_utils.R"))
-
-
 metadata = readxl::read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[!is.na(metadata$IDAT) & metadata$IDAT != "see primary", ]
 metadata$patiend_id = sub("(\\d+)[A-Za-z].*$", "\\1", metadata$`Study ID`)
 
@@ -27,7 +23,8 @@ RGset = RGset[, metadata$IDAT] # reorder to match metadata+
 message(dim(RGset)[2], " samples collected in combined RGset, each containing ", dim(RGset)[1], " probes")
 
 # 2. normal reference brain samples (n=4+12)
-# source 1: TCGA adult brain methylomes (n = 4), source 2: children brain methylomes (n = 12) from Franklin et al. 25 (see https://www.biorxiv.org/content/10.1101/2025.02.21.639467v1)
+# source 1: TCGA adult normal brain methylomes (n = 4, see https://portal.gdc.cancer.gov/, case IDs: C3N-03450, C3N-03026, TCGA-74-6573, C3N-03446)
+# source 2: children brain methylomes from Franklin et al. 25 (n = 12, see https://www.biorxiv.org/content/10.1101/2025.02.21.639467v1, all cases with age > 0)
 idat_dir_ref_450k = "450k"
 idat_dir_ref_epic = "EPIC"
 RGset_ref_450k = read.metharray.exp(base = idat_dir_ref_450k, recursive = TRUE, targets = NULL, force = T) # use "recursive" = TRUE to read in all files in the dir
