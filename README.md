@@ -1,6 +1,6 @@
-# Source code for Schüftan et al. 2025
+# Source code for Schüftan et al.
 
-This repository contains all code developed for the study "Integrated dual-omics analysis elucidates transcriptional heterogeneity and hypoxia-driven spatial organisation in supratentorial ependymoma".
+This repository contains all code developed for the study "Integrated dual-omics analysis elucidates transcriptional heterogeneity and hypoxia-driven spatial organisation in supratentorial ependymoma" (unrevised, unpublished).
 
 ### 1. Single-nucleus analyses  
 - *01_processing.R:* quality control, filtering, integration and clustering of raw single-nucleus data
