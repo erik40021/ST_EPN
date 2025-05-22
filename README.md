@@ -32,7 +32,7 @@ Collection of all utility functions needed to run the analyses above.
 
 
 ## General notes
-Raw and processed data used in this study can be downloaded under EGA repository (link coming soon).
+Raw and processed data used in this study can be downloaded under EGA repository (coming soon).
 
 NMF analysis was mainly based on Gavish et al. 23 (see https://doi.org/10.1038/s41586-023-06130-4 for additional reference).
 
