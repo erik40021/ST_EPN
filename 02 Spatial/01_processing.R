@@ -1,9 +1,6 @@
 library(Seurat)
 library(ggplot2)
 library(patchwork)
-library(pals)
-library(RColorBrewer)
-library(readxl)
 
 source("utils/seurat_utils.R")
 source("utils/spatial_utils.R")
