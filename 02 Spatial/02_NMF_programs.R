@@ -351,6 +351,7 @@ pheatmap::pheatmap(jac_mtx, color = heatmap_col1, angle_col = "45", fontsize = 2
 heatmap_col1 = colorRampPalette(c("white", "#e0e1dd", "#c3cbd6", "#9eb8d9", "#778da9", "#415a77", "#1b263b", "black"))(100)
 jac_mtx = jac_mtx[rowSums(jac_mtx) > 5, ]
 pheatmap::pheatmap(t(jac_mtx), color = heatmap_col1, angle_col = "90", fontsize = 22, scale = "none", main = paste0("MPs vs. EPN-ST signatures by jaccard ind."),
+                   cluster_cols = F, cluster_rows = F, filename = file.path(anno_out_dir, "01_heatmap_MPs_vs_EPN-ST-sigs_jaccard_unscaled_custom.png"), width = 10, height = 10)
 
 # b) annotate with GO terms
 enrich_signatures_GO(metaprograms, anno_out_dir)
