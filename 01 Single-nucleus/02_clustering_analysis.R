@@ -152,7 +152,7 @@ saveRDS(malig_sobj, "ST_EPN_malig.rds")
 # # >>> for that follow '04_NMF_programs.R' <<<
   
 # assign each cell to one MP
-mps = openxlsx::read.xlsx("NMF_metaprograms_main.xlsx"), sheet = "MP genes (final)")
+mps = openxlsx::read.xlsx("NMF_metaprograms_main.xlsx", sheet = "MP genes (final)")
 mp_list = lapply(mps, function(col) col)
 malig_sobj = Seurat::AddModuleScore(malig_sobj, features = mp_list, name = "MP") # add expression scores of each MP to each cell
 malig_sobj = assign_cells_by_max_score(malig_sobj, score_names = paste0("MP", 1:length(mp_list)), meta_data_entry_name = "metaprogram")
