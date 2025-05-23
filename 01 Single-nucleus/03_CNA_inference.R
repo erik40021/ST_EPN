@@ -1,12 +1,8 @@
 library(infercnv)
 library(Seurat)
-library(ggplot2)
 library(parallel)
 library(ComplexHeatmap)
 library(igraph)
-library(patchwork)
-library(circlize)
-library(RColorBrewer)
 
 source("utils/r_utils.R")
 
