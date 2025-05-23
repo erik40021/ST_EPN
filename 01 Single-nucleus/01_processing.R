@@ -1,12 +1,7 @@
 library(Seurat)
 library(patchwork)
-library(ggpubr)
-library(pheatmap)
 library(RColorBrewer)
 library(ggplot2)
-library(Seurat)
-library(patchwork)
-library(ggpubr)
 
 cloud_path = ""
 source("utils/seurat_utils.R")
