@@ -1,7 +1,6 @@
 library(reshape2)
 library(NMF)
 library(ggplot2)
-library(scales)
 library(writexl)
 library(readxl)
 library(pals)
