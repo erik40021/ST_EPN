@@ -1,12 +1,11 @@
 library(infercnv)
 library(Seurat)
 library(ggplot2)
+library(ggstatsplot)
 library(parallel)
 library(ComplexHeatmap)
 library(igraph)
 library(patchwork)
-library(circlize)
-library(RColorBrewer)
 
 source("utils/r_utils.R")
 source("utils/seurat_utils.R")
@@ -171,11 +170,6 @@ data$subtype = metadata$Subtype[match(data$sample, metadata$`Study ID`)]
 # a. ggpubr version:
 ggviolin(data, x = "metaprogram", y = "correlation", add = "boxplot", fill = "metaprogram", palette = st_mp_cols, add.params = list(fill = "white")) + labs(x = "metaprogram", y = "correlation to malignancy score") # + stat_compare_means(method = "t.test", label = "p.format", comparisons = NULL) # Global significance across groups
 ggsave(filename = "01a_violin_norm-malignancy-score_vs_MP_score_correlation.png", width = 9, height = 5, path = out_dir)
-# # split by subtype:
-# ggviolin(data, x = "metaprogram", y = "correlation", add = "boxplot", fill = "metaprogram", palette = cna_cols, add.params = list(fill = "white")) + 
-#   labs(x = "metaprogram", y = "correlation to malignancy score") + # stat_compare_means(method = "t.test", label = "p.format", comparisons = NULL) # Global significance across groups
-#   facet_wrap(~subtype)
-# ggsave(filename = "01b_violin_malignancy-score_vs_MP_score_correlation_split-by-subtype.png", width = 12, height = 8, path = out_dir)
 # b. ggbetweenstats version:
 ggbetweenstats(data, metaprogram, correlation, type = "parametric", pairwise.display = "none", p.adjust.method = "holm", mean.plotting = TRUE,
                mean.ci = TRUE, messages = FALSE, violin.args = list(width = 1, alpha = 0), boxplot.args = list(alpha = 0, width = 0.2), 
