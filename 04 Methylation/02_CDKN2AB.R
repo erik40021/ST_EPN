@@ -1,4 +1,4 @@
-library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19) # reference annotation for EPIC (=850k) methylation data
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19) # reference annotation for EPIC methylation data
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19) # reference annotation for 450k methylation data
 library(minfi)
 library(conumee2)
