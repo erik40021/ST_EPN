@@ -2,7 +2,6 @@ library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19) # reference annotation fo
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19) # reference annotation for 450k methylation data
 library(minfi)
 library(conumee2)
-library(ggplot2)
 library(dplyr)
 
 metadata = readxl::read_excel("masterlist_EPN-ST.xlsx", skip = 1); metadata = metadata[!is.na(metadata$IDAT) & metadata$IDAT != "see primary", ]
