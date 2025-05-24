@@ -39,6 +39,7 @@ prepare_graph_data = function(asso, pvals, max_type_only = F, p_threshold = 0.05
 
 # stacks contact associations horizontally, co-localisations vertically
 construct_graph <- function(data, root_node, verticality_threshold = 0.5) {
+  library(dplyr)
   layers <- list(root_node)
   visited <- c(root_node) # Keep track of visited nodes
   layer_index <- 1 # Current layer index
