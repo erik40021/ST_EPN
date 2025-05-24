@@ -20,7 +20,6 @@ ref_dir = ""
 
 # --- PART 1: prepare meth. data (only needed once) ---
 # 1. prepare ref meth. data
-# for (gz_file in list.files(ref_dir, recursive = T, full.names = T)) GEOquery::gunzip(gz_file, overwrite = TRUE) # unzip all files first (only one time)
 ref_files = list.files(ref_dir, pattern = ".idat$", recursive = T, full.names = F)
 idat_red = sub(".*GSM[0-9]+[_/]", "", ref_files); idat_red = idat_red[grepl("Red", idat_red)]
 message("samples not found in metadata: ", idat_red[!idat_red %in% pohl_metadata$`idat file 2`]) # check that all ref files have metadata (should be empty here!)
