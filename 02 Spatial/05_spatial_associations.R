@@ -1,16 +1,9 @@
-library(stringr)
 library(readxl)
-library(dplyr)
-library(tidyr)
 library(ggplot2)
-library(ComplexHeatmap)
-library(pheatmap)
 library(Seurat)
-library(circlize)
 library(RColorBrewer)
 library(gridExtra)
 library(grid)
-library(patchwork)
 
 source("utils/spatial_score_utils.R")
 
@@ -119,8 +112,6 @@ spot_malignancy = lapply(sample_ids, function(s) ifelse(all_raw_malignancy_score
 # define functional zones based on higher-order model
 zones = list(hyp = c("Hypoxia", "Stress"), 'hyp-adj' = c("Inflammatory"), 'angio-adj' = c("Myeloid", "Vasc", "Fibroblast"),
              Tdiff = c("Astroglial", "Cilia", "Interferon-re"), Tundiff = c("ZFTA-fus", "NSC"))
-library(ggforce)
-library(scatterpie)
 all_spots_fzone_score_norm = lapply(all_spots_programs_comp, function(s) {
   as.data.frame(t(apply(s, 1, function(spot) { 
     scores = sapply(zones, function(zone) mean(as.numeric(unlist(spot[zone]))))
