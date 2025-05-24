@@ -5,7 +5,7 @@ run_NMF = function(sobj_path, out_path, range, n_features) {
   # 1. ---- load and prepare data -----
   sobj = readRDS(file = paste0(sobj_path, "/sobj", s, ".rds"))
   data = as.matrix(GetAssayData(sobj, layer = 'scale.data'))
-  data = data[VariableFeatures(sobj)[1:n_features], ]
+  data = data[Seurat::VariableFeatures(sobj)[1:n_features], ]
   data[data < 0] = 0  # set negative values to zero
   data = data[apply(data, 1, var) > 0,] # subset on genes with a variance above zero
   message("[", s, "] Extracted matrix of dimensions ", dim(data)[1], " (genes) x ", dim(data)[2], " (spots)")
