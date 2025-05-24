@@ -4,6 +4,7 @@
 
 # calculates spatial gradients for a given sample and window size (-> main, most time-intensive scoring function, recommended to run on HPC)
 calculate_spatial_complexity = function(s, w, rand_num, inner_cores) {
+  library(parallel)
   message("calculating 'spatial gradients by window' for sample ", s, " using params w = ", w, ", rand_num = ", rand_num, 
   ", inner_cores = ", inner_cores, " (start time: ", format(Sys.time(), "%H:%M"), ")")
   
@@ -36,7 +37,7 @@ calculate_spatial_complexity = function(s, w, rand_num, inner_cores) {
     
     programs_gradients_in_spot = sapply(1:length(mp_names), function(prog_ind) { # calculate spatial gradients separately per program
       win_spots_program_scores = all_win_program_abund[, prog_ind]; names(win_spots_program_scores) = rownames(all_win_program_abund)
-      win_spots_indices = str_detect(rownames(neighbors_table), paste(paste0(win_spots, ".", prog_ind, "\\b"), collapse = "|")) # fastest to find spots indices using collapsed regex pattern
+      win_spots_indices = stringr::str_detect(rownames(neighbors_table), paste(paste0(win_spots, ".", prog_ind, "\\b"), collapse = "|")) # fastest to find spots indices using collapsed regex pattern
       program_neighbors_table = neighbors_table[win_spots_indices, ] # all spots within the window and their neighbours
       rownames(program_neighbors_table) = substr(rownames(program_neighbors_table), start = 0, stop = 18)
       program_neighbors_table = program_neighbors_table[win_spots, ] # rename and reorder to match win_spots_program_scores
@@ -356,6 +357,7 @@ win_prox_neighbors_table_func_comp = function(spots_positions, spots_programs_co
 # ---- plotting helper functions ----
 
 program_coherence_per_sample_data = function() {
+  library(dplyr); library(tidyr)
   all_coherence_scores = data.frame(matrix(nrow = length(sample_ids), ncol = ncol(metaprograms)))
   colnames(all_coherence_scores) = colnames(metaprograms); rownames(all_coherence_scores) = sample_ids
   for (i in 1:length(sample_ids)) {
@@ -373,6 +375,7 @@ program_coherence_per_sample_data = function() {
 }
 
 program_complexity_per_sample_data = function() {
+  library(dplyr); library(tidyr)
   complexity = data.frame(matrix(nrow = length(sample_ids), ncol = ncol(metaprograms)))
   colnames(complexity) = colnames(metaprograms); rownames(complexity) = sample_ids
   for (i in 1:length(sample_ids)) {
@@ -391,6 +394,7 @@ program_complexity_per_sample_data = function() {
 
 
 plot_score_per_sample = function(data, split.by = NULL, anno = NULL, anno_name = "", order_manual = NULL, ylab = "score") {
+  library(patchwork)
   if (is.null(split.by)) split.by = rep("all", length(sample_ids)); names(split.by) = sample_ids # return(plot_score_per_sample_simple(data, ylab))
   # mp_cols = my_cols[1:ncol(metaprograms)]; names(mp_cols) = names(metaprograms)
   y_max <- max(data$score, na.rm = TRUE); y_min = min(data$score, na.rm = TRUE)
@@ -422,6 +426,7 @@ plot_score_per_sample = function(data, split.by = NULL, anno = NULL, anno_name =
 }
 
 plot_mean_score = function(scores, score_name, separate_wins = F, adjust_by_abund = F, split.by = NULL, add_trendline = T) {
+  library(dplyr); library(patchwork); library(tidyr)
   if (is.null(split.by)) split.by = rep("all", length(sample_ids))
   # --- 1. get data and put into ggplot shape ---
   if (separate_wins) { # use scores ='complexity' here
@@ -485,6 +490,7 @@ plot_mean_score = function(scores, score_name, separate_wins = F, adjust_by_abun
 }
 
 plot_mean_score_comparative = function(scores, split.by, pair = NULL, score_name = "complexity", order_by_difference = T, cols = NULL) {
+  library(dplyr)
   if (is.null(pair)) pair = split.by
   # --- 1. get data and put into ggplot shape ---
   mean_prog_score = lapply(1:length(sample_ids), function(i) colMeans(scores[[i]], na.rm = T))
@@ -516,6 +522,7 @@ plot_mean_score_comparative = function(scores, split.by, pair = NULL, score_name
 
 
 plot_mp_zone_abundance = function(mp_zone_abund, zone_cols, ylim = c(1, 1), split.by = NULL, group.by = NULL, normalise = T) {
+  library(dplyr); library(tidyr)
   if (is.null(split.by)) split.by = rep("all", length(sample_ids))
   plots = lapply(unique(split.by), function(group) {
     data = mp_zone_abund[split.by == group]
@@ -594,6 +601,7 @@ get_perimeter_abund = function(all_spot_progs, neighbors_table, mp_names, w) {
 
 plot_association_heatmap = function(mtx, order_mode = "association_type", title = NA, silent = F, asso_type_tresholds = c(0, 0), 
                                     anno = NULL, anno_cols = NULL, gaps_row = NULL, gaps_col = NULL, fixed_scale = F) {
+  library(RColorBrewer)
   if (order_mode == "association_type") {
     types = c("coloc", rep("contact", 5), rep("dist_contact", 10))
     abs_max = apply(mtx, 1, function(pair) pair[which.max(abs(pair))])
@@ -625,7 +633,7 @@ plot_association_heatmap = function(mtx, order_mode = "association_type", title 
 
                        
 target_plot = function(data, radii = "all", add_legend = T) {
-  library(plotrix)
+  library(plotrix); library(graphics); library(RColorBrewer)
   colors <- colorRampPalette(brewer.pal(11, "RdBu"))(100)
   selected_colors = rev(colors)[round((data$score + 1) * 49.5) + 1]; selected_colors[is.na(selected_colors)] = "grey70"
   
@@ -642,6 +650,7 @@ target_plot = function(data, radii = "all", add_legend = T) {
 }
 
 spatial_feature_pies = function(data, pie_size = 0.7, fzone_cols = NULL) {
+  library(scatterpie)
   if (is.null(fzone_cols)) fzone_cols = c(hyp="black", TMEinf = "#F6CF71", Tundiff= "#6eccfa", Tdiff = "grey90")
   data$V3 = -data$V3
   # scale coordinates to have the same range so that plot ratio is not fucked
@@ -654,6 +663,7 @@ spatial_feature_pies = function(data, pie_size = 0.7, fzone_cols = NULL) {
 
 
 plot_fzone_sig_abundance = function(sig_fzone_abund, zone_cols, ylim = c(1, 1), split.by = NULL, group.by = NULL, normalise = T, add_var = F) {
+  library(dplyr); library(tidyr)
   if (is.null(split.by)) split.by = rep("all", length(sample_ids))
   plots = lapply(unique(split.by), function(group) {
     by_treshold_mode = is.list(sig_fzone_abund[[2]]) # if second element is another list, assume abundance was calculated by hard treshold (instead of weighted average)
@@ -695,6 +705,7 @@ plot_fzone_sig_abundance = function(sig_fzone_abund, zone_cols, ylim = c(1, 1), 
 
 
 plot_zone_sig_composition = function(zone_abund, sig_cols, zone_order = NULL, sig_order = NULL, split.by = NULL, normalise = T, split_y_axis = NULL, ylim = c(NA,NA)) {
+  library(tidyr)
   if (is.null(split.by)) split.by = rep("all", length(sample_ids))
   if (length(zone_abund) == 2 & is.list(zone_abund[[1]])) { # case for fzone input data, which is based on average zone abund per spot (transform first here)
     zone_abund = lapply(1:length(zone_abund[[1]]), function(i) sweep(zone_abund[[1]][[i]], 2, zone_abund[[2]][, i], `*`))
@@ -720,6 +731,7 @@ plot_zone_sig_composition = function(zone_abund, sig_cols, zone_order = NULL, si
 }
 
 plot_all_sig_zone_abundances = function(szone_abund, fzone_abund, out_dir, add_var = F) {
+  library(patchwork)
   # a) abundance of signatures in STRUCTURAL zones 
   plots = plot_mp_zone_abundance(szone_abund, szone_cols, ylim = c(1, 1.1))[[1]] + ggtitle(paste0("all (min_score = ", min_score_threshold, ")"))
   ggsave(paste0("01a_sig_abund_in_szones_", min_score_threshold, ".png"), plot = plots, width = 5, height = 4, path = out_dir)
@@ -762,7 +774,7 @@ plot_all_sig_zone_abundances = function(szone_abund, fzone_abund, out_dir, add_v
 
 
 get_sig_scores = function(sigs, plot_sigs = F, out_dir = NULL, nrow = 2) {
-  source("utils/seurat_utils.R")
+  source("utils/seurat_utils.R"); library(Seurat); library(patchwork)
   if (!is.null(out_dir) && !dir.exists(out_dir)) dir.create(out_dir, r = T)
   overview_subtitles = c(names(sigs), "[Counts]", "[Features]", "[H&E]")
   all_spots_programs_comp = list(); all_spots_programs_comp_norm = list(); all_spots_programs_comp_spot_norm = list()
