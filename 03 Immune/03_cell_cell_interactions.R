@@ -41,7 +41,6 @@ write.table(metadata, file = file.path(save_dir, "meta.tsv"), sep="\t", quote=F,
 # 1. run CellPhoneDB v5.0.0 with default parameters (function 'cpdb_statistical_analysis_method') in Python
 
 # 2. (optional) visualise results with InterCellar
-library(InterCellar)
 InterCellar::run_app(reproducible = TRUE) # starts shiny app in browser
 
 # 3. customise interaction plots
@@ -92,7 +91,6 @@ ggsave("02_cci_dotplot_tumour-hyp_vs_tumour.png", width = 9, height = 5, path = 
 
 
 # plot differential interactions from both tumour and tumour-hyp as circle plot
-library(circlize)
 cols = c(Tumour="black", 'Hypoxia-re'="grey30", Sys.inflam="brown", 'HS-UPR'="#d5bdaf", "T.cell-naive"="#4e81a3", 
          Macrophage="#EF4868", "T.cell-cyt"="#66C5CC", Monocyte="#ff918a", Microglia="#967bad", B.cell="#e3d536", "Cell-cycle"="#F2B701")
 
