@@ -15,6 +15,7 @@ assign_classes <- function(clusters, meth_class) {
 }
 
 run_louvain_iterations <- function(graph, res = 1, n_iter = 100) {
+  library(igraph)
   clusters_list <- list()
   for (i in seq_len(n_iter)) clusters_list[[i]] = membership(cluster_louvain(graph, weights = E(graph)$weight, resolution = res))
   return(clusters_list)
