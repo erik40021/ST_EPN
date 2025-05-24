@@ -1,14 +1,8 @@
 
 Read_CellBender_h5_Mat <- function(file_name, use.names = TRUE, unique.features = TRUE) {
-  # Check hdf5r installed
-  if (!requireNamespace('hdf5r', quietly = TRUE)) cli_abort(message = c("Please install hdf5r to read HDF5 files", "i" = "`install.packages('hdf5r')`"))
-  # Check file
   if (!file.exists(file_name)) stop("File not found")  
-  if (use.names) {
-    feature_slot <- 'features/name'
-  } else {
-    feature_slot <- 'features/id'
-  }
+  if (use.names) { feature_slot <- 'features/name'
+  } else feature_slot <- 'features/id'
   # Read file
   infile <- hdf5r::H5File$new(filename = file_name, mode = "r")
   counts <- infile[["matrix/data"]]
@@ -53,6 +47,7 @@ plot_features_signature = function(sobj, sig_name, features, reduction = "umap.u
 
 plot_violin_signature = function(sobj, features, sig_name = NA, stacked = T, as_heatmap = F, x_lab = NULL, y_lab = NULL, cols = NULL,
                                  cluster_rows = T, cluster_cols = T, group.by = NULL, sort = T, scale_heatmap = "none", idents = NULL) {
+  library(RColorBrewer)
   if (stacked) {
     if (is.list(features)) {
       if (is.null(y_lab)) { warning("using names of features list as y-axis labels"); y_lab = names(features) }
@@ -276,7 +271,7 @@ plot_heatmap_mp_vs_ref = function(refs, mps, min_log2fc = 1, max_p = 0.05, clust
 }
 
 plot_heatmap_mps_vs_cells = function(sobj, mps, reduced_cell_n = NA) {
-  library(pheatmap)
+  library(pheatmap); library(RColorBrewer)
   # sobj = ScaleData(sobj, features = mps)
   if (!is.na(reduced_cell_n)) { # randomly takes out the specified number of cells
     data = (FetchData(sobj, vars = mps, layer = "data", cells = sample.int(length(colnames(sobj)), reduced_cell_n)))
@@ -297,7 +292,13 @@ plot_heatmap_mps_vs_cells = function(sobj, mps, reduced_cell_n = NA) {
                   color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(100)[20:100], 
                   show_colnames = F, show_rownames = show_rownames, cutree_rows = 14, cluster_rows = F, silent = T))
 }
-
+                                           
+scale_per_gene = function(data, range = c(0,1)) {
+  library(caret)
+  ss = preProcess(data, method=c("range"), rangeBounds = range)
+  data_scaled = predict(ss, data)
+  return(data_scaled)
+}
 
 try_add_module_score <- function(sobj, features, name, ctrl = 100, ctrl_decrement = 5, min_ctrl = 50, nbin = 24, min_bin = 18, verbose = F) {
   current_ctrl <- ctrl  # Startwert für ctrl
