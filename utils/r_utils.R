@@ -130,6 +130,13 @@ save_degs_sheetwise = function(degs, filename, order_signs_separately = F, order
   saveWorkbook(wb, filename, overwrite = TRUE)
 }
 
+cbind_fill_na <- function(df1, df2) {
+  max_rows <- max(nrow(df1), nrow(df2))
+  df1_expanded <- rbind(df1, data.frame(matrix(ncol = ncol(df1), nrow = max_rows - nrow(df1), dimnames = list(NULL, names(df1))))) 
+  df2_expanded <- rbind(df2, data.frame(matrix(ncol = ncol(df2), nrow = max_rows - nrow(df2), dimnames = list(NULL, names(df2))))) 
+  cbind(df1_expanded, df2_expanded)
+}
+
 read_excel_allsheets <- function(filename, tibble = FALSE, specific_col = NULL, skip = 0) {
   library(readxl)
   sheets <- readxl::excel_sheets(filename)
