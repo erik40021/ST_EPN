@@ -57,7 +57,7 @@ saveRDS(coherence, file.path(base_dir, "coherence.rds"))
 win_sizes = c(5, 8, 11)
 rand_num = 100
 for (w in win_sizes) {
-  all_scores = lapply(sample_ids, function(s) calculate_spatial_complexity(s, w, rand_num, mp_names)) # runs sequentially
+  all_scores = lapply(sample_ids, function(s) calculate_spatial_complexity(s, w, rand_num, mp_names, inner_cores = 1)) # runs sequentially
   saveRDS(all_scores, paste0(base_dir, "/01_scores_w", w, ".rds"))
 }
 
