@@ -1,10 +1,6 @@
 library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19) # reference annotation for EPIC methylation data
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19) # reference annotation for 450k methylation data
 library(minfi)
-library(ggplot2)
-library(viridis)
-library(uwot)
-library(igraph)
 library(Seurat)
 library(dplyr)
 
@@ -86,7 +82,7 @@ top_features <- names(sort(feature_variances, decreasing = TRUE))[1:100000]
 saveRDS(top_features, file = file.path(out_dir, "top_var_features.rds"))
 top_betas = beta_values[top_features, ]
 
-# 2. PCA -> k-means/louvain clustering
+# 2. PCA
 pca_res <- prcomp(t(top_betas), scale. = TRUE) # perform PCA on the top 100,000 features
 explained_variance <- pca_res$sdev^2 / sum(pca_res$sdev^2); cumulative_variance <- cumsum(explained_variance)
 png(file.path(out_dir, "elbow_plot_pca.png"), width = 1000, height = 1000)
@@ -95,19 +91,18 @@ abline(h = 0.9, col = "red", lty = 2) # Add a horizontal line at 90% cumulative 
 dev.off()
 pca_data <- pca_res$x[, 1:40] # Use top principal components for clustering
 
-# 4. visualise clusters in PCs, tSNE
 tsne = Rtsne::Rtsne(pca_data[, 1:40], perplexity = 50, verbose = TRUE, theta = 0, pca = F, iterations = 2000) # option 2: t-SNE
 meth_data = cbind(PC1 = pca_res$x[, 1], PC2 = pca_res$x[, 2], tSNE1 = tsne$Y[, 1], tSNE2 = tsne$Y[, 2], combined_metadata)
 
-# multi-iteration clustering with confidence calculation
+# 3. multi-iteration clustering with confidence calculation
 meth_class = meth_data$meth_class; meth_class[meth_data$class_score <= 0.8] = NA
 meth_class[grepl("ZFTA", meth_class)] = "ZFTA"; meth_class[grepl("ST_SE", meth_class)] = "ST_SE"; meth_class[grepl("YAP1", meth_class)] = "YAP1"
 
-# 1. louvain clustering based on top 40 PCs distance matrix (using the graph built above)
+# 3.1 louvain clustering based on top 40 PCs distance matrix (using the graph built above)
 clusters_list <- run_louvain_iterations(graph, res = 1.1, n_iter = 1000)
 assigned_classes <- lapply(clusters_list, assign_classes, meth_class) # Map clusters to classes for each iteration
 class_matrix_louvain_pc <- do.call(cbind, assigned_classes)
-# 2. kmeans clustering
+# 3.2 kmeans clustering
 clusters_list <- run_kmeans_iterations(pca_data, k = 10, n_iter = 1000)
 assigned_classes <- lapply(clusters_list, assign_classes, meth_class)
 class_matrix_kmeans <- do.call(cbind, assigned_classes)
