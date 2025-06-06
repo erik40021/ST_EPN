@@ -256,8 +256,8 @@ anno = ggplot(data = color_data, aes(x = 0, y = y)) + geom_tile(aes(fill = Color
 ggsave(anno + g2 + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main.png", width = 10, height = 8, path = mp_gen_dir)
 
 cols = c(colorRampPalette(c("white", rev(viridis::mako(323, begin = 0.13))[1]))(20), rev(viridis::mako(323, begin = 0.1)))
-plot_NMF_heatmap(robust_program_intersects_meltI, xlab = paste0("robust NMF program (n = ",length(inds_sorted), ")"), ylab = "robust NMF program", limits = c(5,25), cols = cols)
-ggsave(anno + g2 + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main_alternative-color.png", width = 10, height = 8, path = mp_gen_dir)
+g2_alt = plot_NMF_heatmap(robust_program_intersects_meltI, xlab = paste0("robust NMF program (n = ",length(inds_sorted), ")"), ylab = "robust NMF program", limits = c(5,25), cols = cols)
+ggsave(anno + g2_alt + labs(y = NULL) + plot_layout(widths = c(1, 14)), filename = "01_heatmap_MPs_main_alternative-color.png", width = 10, height = 8, path = mp_gen_dir)
 
 
 # c) labeled main heatmaps
