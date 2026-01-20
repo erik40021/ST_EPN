@@ -1,6 +1,6 @@
 # Source code for Schüftan et al.
 
-This repository contains all code developed for the study "Integrated Single-Nucleus and Spatial Transcriptomics Elucidate Heterogeneity and Hypoxia-Driven Organization of Supratentorial Ependymoma" (https://doi.org/10.1158/0008-5472.CAN-25-2694).
+This repository contains all code developed for Schüftan et al., "Integrated Single-Nucleus and Spatial Transcriptomics Elucidate Heterogeneity and Hypoxia-Driven Organization of Supratentorial Ependymoma" (https://doi.org/10.1158/0008-5472.CAN-25-2694).
 
 ### 1. Single-nucleus analyses  
 - *01_processing.R:* quality control, filtering, integration and clustering of raw single-nucleus data
